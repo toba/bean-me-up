@@ -5,34 +5,31 @@ description: Stage all changes and commit with a descriptive message. Use when t
 
 ## Workflow
 
-1. Run pre-commit checks:
+1. Review changes and current version:
    ```bash
-   golangci-lint run && go test ./...
-   ```
-   If checks fail, report issues and STOP.
-
-2. Stage and review changes:
-   ```bash
-   git add -A
-   git status --short
-   git diff --staged
+   git diff
+   git describe --tags --abbrev=0 2>/dev/null || echo "no tags yet"
    ```
 
-3. Create commit with concise, descriptive message:
-   - Lowercase, imperative mood (e.g., "add feature" not "Added feature")
-   - Focus on "why" not just "what"
-   - End with: `Co-Authored-By: Claude <noreply@anthropic.com>`
+2. Analyze staged changes for version bump:
+   - **Major (X.0.0)**: Breaking changes - removed/renamed public APIs, changed behavior
+   - **Minor (0.X.0)**: New features - new capabilities, new CLI flags
+   - **Patch (0.0.X)**: Bug fixes, docs, refactoring, dependency updates
 
-4. Verify: `git status`
+3. Craft commit message:
+   - Subject: lowercase, imperative mood (e.g., "add feature" not "Added feature")
+   - Description: focus on "why" not just "what"
 
-5. Determine version bump (if any tags exist, otherwise skip):
-   - Check current version: `git describe --tags --abbrev=0 2>/dev/null || echo "none"`
-   - Analyze the committed changes:
-     - **Major (X.0.0)**: Breaking changes - removed/renamed public APIs, changed behavior
-     - **Minor (0.X.0)**: New features - new rules, new CLI flags, new capabilities
-     - **Patch (0.0.X)**: Bug fixes, docs, refactoring, dependency updates
-   - If version bump warranted, create annotated tag:
-     ```bash
-     git tag -a vX.Y.Z -m "Release vX.Y.Z"
-     ```
-   - Report: "Tagged vX.Y.Z" or "No version bump needed"
+4. Run commit script:
+   ```bash
+   # Without version bump:
+   .claude/skills/commit/scripts/commit.sh "subject" "description"
+
+   # With version bump:
+   .claude/skills/commit/scripts/commit.sh "subject" "description" vX.Y.Z
+
+   # Subject only (no description):
+   .claude/skills/commit/scripts/commit.sh "subject" ""
+   ```
+
+The script handles everything: lint, test, gitignore check, stage, commit, sync beans, push, and release (if version provided).

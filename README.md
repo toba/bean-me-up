@@ -26,27 +26,27 @@ go build ./cmd/beanup
 
 ## Setup
 
-1. Create a `.bean-me-up.yml` configuration file in your project:
+1. Create a `.beans.clickup.yml` configuration file in your project:
 
 ```yaml
-beans_path: .beans              # Path to beans directory
-
-clickup:
-  list_id: "123456789"          # Required: ClickUp list ID
-  assignee: 12345               # Optional: default assignee user ID
-  status_mapping:               # Optional: custom status mappings
-    draft: "backlog"
-    todo: "to do"
-    in-progress: "in progress"
-    completed: "complete"
-  custom_fields:                # Optional: map bean fields to ClickUp fields
-    bean_id: "field-uuid"
-    created_at: "field-uuid"
-    updated_at: "field-uuid"
-  users:                        # Optional: for @mention support
-    jason: 12345
-  sync_filter:
-    exclude_status: ["scrapped"]
+beans:
+  clickup:
+    list_id: "123456789"          # Required: ClickUp list ID
+    assignee: 12345               # Optional: default assignee user ID
+    status_mapping:               # Optional: custom status mappings
+      draft: "backlog"
+      todo: "to do"
+      in-progress: "in progress"
+      completed: "complete"
+    custom_fields:                # Optional: map bean fields to ClickUp fields
+      bean_id: "field-uuid"
+      created_at: "field-uuid"
+      updated_at: "field-uuid"
+    users:                        # Optional: for @mention support
+      jason: 12345
+    sync_filter:
+      exclude_status:
+        - scrapped
 ```
 
 2. Set the `CLICKUP_TOKEN` environment variable:
@@ -147,19 +147,17 @@ beanup status --json
 
 ## Configuration Reference
 
-### `beans_path`
+The configuration file uses a nested structure under `beans.clickup`. The beans path is read from `.beans.yml` (the beans CLI configuration).
 
-Path to the beans directory, relative to the config file. Default: `.beans`
-
-### `clickup.list_id`
+### `beans.clickup.list_id`
 
 Required. The ClickUp list ID to sync tasks to.
 
-### `clickup.assignee`
+### `beans.clickup.assignee`
 
 Optional. ClickUp user ID to assign new tasks to. If not set, tasks are assigned to the API token owner. Set to `0` for unassigned tasks.
 
-### `clickup.status_mapping`
+### `beans.clickup.status_mapping`
 
 Map bean statuses to ClickUp status names. Defaults:
 
@@ -172,7 +170,7 @@ status_mapping:
   scrapped: "closed"
 ```
 
-### `clickup.priority_mapping`
+### `beans.clickup.priority_mapping`
 
 Map bean priorities to ClickUp priority values (1=Urgent, 2=High, 3=Normal, 4=Low). Defaults:
 
@@ -185,7 +183,7 @@ priority_mapping:
   deferred: 4
 ```
 
-### `clickup.custom_fields`
+### `beans.clickup.custom_fields`
 
 Map bean fields to ClickUp custom field UUIDs:
 
@@ -196,7 +194,7 @@ custom_fields:
   updated_at: "uuid"   # Date field for last update
 ```
 
-### `clickup.users`
+### `beans.clickup.users`
 
 Map usernames to ClickUp user IDs for @mention support:
 
@@ -208,7 +206,7 @@ users:
 
 When syncing, @mentions in bean bodies create a comment tagging the users.
 
-### `clickup.sync_filter`
+### `beans.clickup.sync_filter`
 
 Control which beans are synced:
 

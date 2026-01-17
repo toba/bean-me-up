@@ -10,3 +10,4 @@ go = "1.25"
 # Go-based tools - use latest, these are dev tools
 "go:github.com/hmans/beans" = "latest"
 "go:github.com/STR-Consulting/bean-me-up/cmd/beanup" = "latest"
+"go:github.com/golangci/golangci-lint/v2/cmd/golangci-lint" = "2.1"
