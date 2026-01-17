@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/pacer/bean-me-up/internal/beans"
-	"github.com/pacer/bean-me-up/internal/syncstate"
+	"github.com/STR-Consulting/bean-me-up/internal/beans"
+	"github.com/STR-Consulting/bean-me-up/internal/syncstate"
 	"github.com/spf13/cobra"
 )
 

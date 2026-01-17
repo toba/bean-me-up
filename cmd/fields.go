@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/pacer/bean-me-up/internal/clickup"
+	"github.com/STR-Consulting/bean-me-up/internal/clickup"
 	"github.com/spf13/cobra"
 )
 

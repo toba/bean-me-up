@@ -1,4 +1,4 @@
-module github.com/pacer/bean-me-up
+module github.com/STR-Consulting/bean-me-up
 
 go 1.23
 

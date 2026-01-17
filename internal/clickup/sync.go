@@ -8,9 +8,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/pacer/bean-me-up/internal/beans"
-	"github.com/pacer/bean-me-up/internal/config"
-	"github.com/pacer/bean-me-up/internal/syncstate"
+	"github.com/STR-Consulting/bean-me-up/internal/beans"
+	"github.com/STR-Consulting/bean-me-up/internal/config"
+	"github.com/STR-Consulting/bean-me-up/internal/syncstate"
 )
 
 // mentionPattern matches @username patterns in text.

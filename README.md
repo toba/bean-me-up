@@ -13,13 +13,13 @@ bean-me-up is a companion tool for the [beans](https://github.com/hmans/beans) i
 ## Installation
 
 ```bash
-go install github.com/pacer/bean-me-up@latest
+go install github.com/STR-Consulting/bean-me-up@latest
 ```
 
 Or build from source:
 
 ```bash
-git clone https://github.com/pacer/bean-me-up
+git clone https://github.com/STR-Consulting/bean-me-up
 cd bean-me-up
 go build .
 ```

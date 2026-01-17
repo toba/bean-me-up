@@ -7,9 +7,9 @@ import (
 	"os"
 	"time"
 
-	"github.com/pacer/bean-me-up/internal/beans"
-	"github.com/pacer/bean-me-up/internal/clickup"
-	"github.com/pacer/bean-me-up/internal/syncstate"
+	"github.com/STR-Consulting/bean-me-up/internal/beans"
+	"github.com/STR-Consulting/bean-me-up/internal/clickup"
+	"github.com/STR-Consulting/bean-me-up/internal/syncstate"
 	"github.com/spf13/cobra"
 )
 
