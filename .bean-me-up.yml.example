@@ -1,0 +1,50 @@
+# bean-me-up configuration example
+# Copy this to .bean-me-up.yml and customize
+
+# Path to beans directory (relative to this config file)
+beans_path: .beans
+
+clickup:
+  # Required: ClickUp list ID (find in list URL or use ClickUp API)
+  list_id: "123456789"
+
+  # Optional: User ID to assign new tasks to
+  # If not set, tasks are assigned to the API token owner
+  # Set to 0 to create unassigned tasks
+  # assignee: 12345
+
+  # Optional: Map bean statuses to ClickUp status names
+  # Run `bean-me-up statuses` to see available statuses
+  status_mapping:
+    draft: "backlog"
+    todo: "to do"
+    in-progress: "in progress"
+    completed: "complete"
+    scrapped: "closed"
+
+  # Optional: Map bean priorities to ClickUp priority values
+  # ClickUp: 1=Urgent, 2=High, 3=Normal, 4=Low
+  priority_mapping:
+    critical: 1
+    high: 2
+    normal: 3
+    low: 4
+    deferred: 4
+
+  # Optional: Map bean fields to ClickUp custom field UUIDs
+  # Run `bean-me-up fields` to see available custom fields
+  # custom_fields:
+  #   bean_id: "uuid-for-text-field"
+  #   created_at: "uuid-for-date-field"
+  #   updated_at: "uuid-for-date-field"
+
+  # Optional: Map usernames to ClickUp user IDs for @mention support
+  # Run `bean-me-up users` to see workspace members
+  # users:
+  #   jason: 12345
+  #   sarah: 67890
+
+  # Optional: Control which beans are synced
+  sync_filter:
+    exclude_status:
+      - scrapped

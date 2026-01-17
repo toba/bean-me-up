@@ -1,0 +1,68 @@
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
+## Build and Development Commands
+
+```bash
+# Build
+go build .
+
+# Run tests
+go test ./...
+
+# Run single test
+go test ./internal/clickup -run TestFunctionName
+
+# Lint (required before commits)
+golangci-lint run
+
+# Install locally
+go install .
+```
+
+## Architecture Overview
+
+bean-me-up syncs [beans](https://github.com/hmans/beans) issue tracker to ClickUp tasks. It operates as a standalone companion that:
+- Invokes the `beans` CLI with `--json` output (no library dependency)
+- Directly manipulates bean markdown files to store sync state in frontmatter
+- Syncs to ClickUp via REST API
+
+### Package Structure
+
+| Package | Purpose |
+|---------|---------|
+| `cmd/` | Cobra CLI commands. Each command is a file; register with `rootCmd.AddCommand()` in `init()` |
+| `internal/config/` | YAML configuration loading with default mappings |
+| `internal/beans/` | Wrapper around beans CLI, JSON parsing |
+| `internal/clickup/` | REST API client with retry logic, sync orchestration |
+| `internal/frontmatter/` | Parses/writes YAML frontmatter in bean markdown files |
+
+### Sync Flow
+
+The sync logic (`internal/clickup/sync.go`) uses a multi-pass approach:
+1. **Pass 1**: Sync parent tasks (beans without parents or parents not in sync set)
+2. **Pass 2**: Sync child tasks (with parent references now available)
+3. **Pass 3**: Sync blocking relationships as ClickUp dependencies
+
+Processing is parallelized with goroutines and `sync.WaitGroup`.
+
+### Sync State Storage
+
+Sync metadata is stored in bean frontmatter (managed by `internal/frontmatter/`):
+```yaml
+sync:
+  clickup:
+    task_id: "868h4abcd"
+    synced_at: "2024-01-15T10:30:00Z"
+```
+
+### API Retry Logic
+
+The ClickUp client (`internal/clickup/client.go`) implements exponential backoff with jitter for rate limits (429, APP_002), transient network errors, and 5xx responses. Max 5 retries, max 30s delay.
+
+## Configuration
+
+Requires `.bean-me-up.yml` (found via upward search from cwd) and `CLICKUP_TOKEN` environment variable.
+
+See `.bean-me-up.yml.example` for all options.
