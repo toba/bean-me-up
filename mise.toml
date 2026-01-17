@@ -1,0 +1,12 @@
+# Dev tool version management via mise (https://mise.jdx.dev/)
+# Run `mise install` to install all tools
+# Run `mise use <tool>@<version>` to update a tool version
+
+[settings]
+
+[tools]
+# Core runtimes - pin major.minor, allow patch updates
+go = "1.25"
+# Go-based tools - use latest, these are dev tools
+"go:github.com/hmans/beans" = "latest"
+"go:github.com/STR-Consulting/bean-me-up/cmd/beanup" = "latest"
