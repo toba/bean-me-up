@@ -26,7 +26,7 @@ var rootCmd = &cobra.Command{
 	Long: `bean-me-up syncs beans (from the beans CLI) to ClickUp tasks.
 
 It works as a companion tool to the standard beans CLI, storing sync
-state in bean frontmatter without modifying how beans works.
+state in .beans/.sync.json without modifying bean files.
 
 Configuration is stored in .bean-me-up.yml in your project directory.`,
 	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {

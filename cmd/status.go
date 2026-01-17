@@ -8,7 +8,7 @@ import (
 
 	"github.com/pacer/bean-me-up/internal/beans"
 	"github.com/pacer/bean-me-up/internal/clickup"
-	"github.com/pacer/bean-me-up/internal/frontmatter"
+	"github.com/pacer/bean-me-up/internal/syncstate"
 	"github.com/spf13/cobra"
 )
 
@@ -22,10 +22,15 @@ status for all beans that are linked to ClickUp tasks.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := context.Background()
 
+		// Load sync state store
+		syncStore, err := syncstate.Load(getBeansPath())
+		if err != nil {
+			return fmt.Errorf("loading sync state: %w", err)
+		}
+
 		// Get beans to check
 		beansClient := beans.NewClient(getBeansPath())
 		var beanList []beans.Bean
-		var err error
 
 		if len(args) > 0 {
 			// Check specific beans
@@ -41,12 +46,7 @@ status for all beans that are linked to ClickUp tasks.`,
 			}
 			// Filter to only linked beans
 			for _, b := range allBeans {
-				beanFilePath := getBeansPath() + "/" + b.Path
-				beanFile, err := frontmatter.Read(beanFilePath)
-				if err != nil {
-					continue
-				}
-				if beanFile.GetClickUpTaskID() != nil {
+				if syncStore.GetTaskID(b.ID) != nil {
 					beanList = append(beanList, b)
 				}
 			}
@@ -82,17 +82,24 @@ status for all beans that are linked to ClickUp tasks.`,
 
 		statuses := make([]statusInfo, len(beanList))
 		for i, b := range beanList {
-			beanFilePath := getBeansPath() + "/" + b.Path
-			beanFile, _ := frontmatter.Read(beanFilePath)
+			taskID := syncStore.GetTaskID(b.ID)
+			syncedAt := syncStore.GetSyncedAt(b.ID)
 
-			taskID := beanFile.GetClickUpTaskID()
+			// Calculate needsSync using sync store timestamp
+			needsSync := true
+			if syncedAt != nil && b.UpdatedAt != nil {
+				needsSync = b.UpdatedAt.After(*syncedAt)
+			} else if syncedAt != nil {
+				needsSync = false
+			}
+
 			statuses[i] = statusInfo{
 				BeanID:     b.ID,
 				BeanTitle:  b.Title,
 				BeanStatus: b.Status,
 				TaskID:     taskID,
 				Linked:     taskID != nil,
-				NeedsSync:  b.NeedsClickUpSync(),
+				NeedsSync:  needsSync,
 			}
 
 			// Fetch live task status if we have a client and task ID

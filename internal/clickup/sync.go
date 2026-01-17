@@ -10,7 +10,7 @@ import (
 
 	"github.com/pacer/bean-me-up/internal/beans"
 	"github.com/pacer/bean-me-up/internal/config"
-	"github.com/pacer/bean-me-up/internal/frontmatter"
+	"github.com/pacer/bean-me-up/internal/syncstate"
 )
 
 // mentionPattern matches @username patterns in text.
@@ -45,18 +45,20 @@ type Syncer struct {
 	config    *config.ClickUpConfig
 	opts      SyncOptions
 	beansPath string // Absolute path to beans directory
+	syncStore *syncstate.Store
 
 	// Tracking for relationship pass
 	beanToTaskID map[string]string // bean ID -> ClickUp task ID
 }
 
 // NewSyncer creates a new syncer with the given client and options.
-func NewSyncer(client *Client, cfg *config.ClickUpConfig, opts SyncOptions, beansPath string) *Syncer {
+func NewSyncer(client *Client, cfg *config.ClickUpConfig, opts SyncOptions, beansPath string, syncStore *syncstate.Store) *Syncer {
 	return &Syncer{
 		client:       client,
 		config:       cfg,
 		opts:         opts,
 		beansPath:    beansPath,
+		syncStore:    syncStore,
 		beanToTaskID: make(map[string]string),
 	}
 }
@@ -73,9 +75,9 @@ func (s *Syncer) SyncBeans(ctx context.Context, beanList []beans.Bean) ([]SyncRe
 		_ = err
 	}
 
-	// Pre-populate mapping with already-synced beans
+	// Pre-populate mapping with already-synced beans from sync store
 	for _, b := range beanList {
-		taskID := b.GetClickUpTaskID()
+		taskID := s.syncStore.GetTaskID(b.ID)
 		if taskID != nil && *taskID != "" {
 			s.beanToTaskID[b.ID] = *taskID
 		}
@@ -184,15 +186,6 @@ func (s *Syncer) syncBean(ctx context.Context, b *beans.Bean) SyncResult {
 		BeanTitle: b.Title,
 	}
 
-	// Read the bean file to access/update frontmatter
-	beanFilePath := s.beansPath + "/" + b.Path
-	beanFile, err := frontmatter.Read(beanFilePath)
-	if err != nil {
-		result.Action = "error"
-		result.Error = fmt.Errorf("reading bean file: %w", err)
-		return result
-	}
-
 	// Build the task description (markdown, with mentions stripped)
 	description := s.buildTaskDescription(b)
 
@@ -205,13 +198,13 @@ func (s *Syncer) syncBean(ctx context.Context, b *beans.Bean) SyncResult {
 	// Map bean priority to ClickUp priority
 	priority := s.getClickUpPriority(b.Priority)
 
-	// Check if already linked
-	taskID := beanFile.GetClickUpTaskID()
+	// Check if already linked (from sync store)
+	taskID := s.syncStore.GetTaskID(b.ID)
 	if taskID != nil && *taskID != "" {
 		result.TaskID = *taskID
 
 		// Check if bean has changed since last sync
-		if !s.opts.Force && !s.needsSync(b, beanFile) {
+		if !s.opts.Force && !s.needsSync(b) {
 			result.Action = "skipped"
 			return result
 		}
@@ -221,12 +214,7 @@ func (s *Syncer) syncBean(ctx context.Context, b *beans.Bean) SyncResult {
 		if err != nil {
 			// Check if task was deleted - if so, unlink and create new
 			if strings.Contains(err.Error(), "Task not found") || strings.Contains(err.Error(), "ITEM_013") {
-				beanFile.ClearClickUpSync()
-				if writeErr := beanFile.Write(); writeErr != nil {
-					result.Action = "error"
-					result.Error = fmt.Errorf("unlinking deleted task: %w", writeErr)
-					return result
-				}
+				s.syncStore.Clear(b.ID)
 				// Fall through to create new task below
 			} else {
 				result.Action = "error"
@@ -265,12 +253,8 @@ func (s *Syncer) syncBean(ctx context.Context, b *beans.Bean) SyncResult {
 				_ = err
 			}
 
-			// Update synced_at timestamp
-			beanFile.SetClickUpSyncedAt(time.Now().UTC())
-			if err := beanFile.Write(); err != nil {
-				// Log but don't fail - sync succeeded, just couldn't save timestamp
-				_ = err
-			}
+			// Update synced_at timestamp in sync store
+			s.syncStore.SetSyncedAt(b.ID, time.Now().UTC())
 
 			result.TaskURL = updatedTask.URL
 			result.Action = "updated"
@@ -319,22 +303,17 @@ func (s *Syncer) syncBean(ctx context.Context, b *beans.Bean) SyncResult {
 		}
 	}
 
-	// Update bean file with task ID and sync timestamp
-	beanFile.SetClickUpTaskID(task.ID)
-	beanFile.SetClickUpSyncedAt(time.Now().UTC())
-	if err := beanFile.Write(); err != nil {
-		result.Action = "error"
-		result.Error = fmt.Errorf("saving bean: %w", err)
-		return result
-	}
+	// Store task ID and sync timestamp in sync store
+	s.syncStore.SetTaskID(b.ID, task.ID)
+	s.syncStore.SetSyncedAt(b.ID, time.Now().UTC())
 
 	result.Action = "created"
 	return result
 }
 
 // needsSync checks if a bean needs to be synced based on timestamps.
-func (s *Syncer) needsSync(b *beans.Bean, bf *frontmatter.BeanFile) bool {
-	syncedAt := bf.GetClickUpSyncedAt()
+func (s *Syncer) needsSync(b *beans.Bean) bool {
+	syncedAt := s.syncStore.GetSyncedAt(b.ID)
 	if syncedAt == nil {
 		return true // Never synced
 	}

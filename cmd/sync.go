@@ -8,6 +8,7 @@ import (
 
 	"github.com/pacer/bean-me-up/internal/beans"
 	"github.com/pacer/bean-me-up/internal/clickup"
+	"github.com/pacer/bean-me-up/internal/syncstate"
 	"github.com/spf13/cobra"
 )
 
@@ -43,6 +44,12 @@ Requires CLICKUP_TOKEN environment variable to be set.`,
 		token, err := getClickUpToken()
 		if err != nil {
 			return err
+		}
+
+		// Load sync state store
+		syncStore, err := syncstate.Load(getBeansPath())
+		if err != nil {
+			return fmt.Errorf("loading sync state: %w", err)
 		}
 
 		// Create clients
@@ -95,7 +102,7 @@ Requires CLICKUP_TOKEN environment variable to be set.`,
 			}
 		}
 
-		syncer := clickup.NewSyncer(client, &cfg.ClickUp, opts, getBeansPath())
+		syncer := clickup.NewSyncer(client, &cfg.ClickUp, opts, getBeansPath(), syncStore)
 
 		// Run sync
 		results, err := syncer.SyncBeans(ctx, beanList)
@@ -106,6 +113,13 @@ Requires CLICKUP_TOKEN environment variable to be set.`,
 		}
 		if err != nil {
 			return fmt.Errorf("sync failed: %w", err)
+		}
+
+		// Save sync state
+		if !syncDryRun {
+			if saveErr := syncStore.Save(); saveErr != nil {
+				return fmt.Errorf("saving sync state: %w", saveErr)
+			}
 		}
 
 		// Output results

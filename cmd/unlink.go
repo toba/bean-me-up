@@ -6,15 +6,15 @@ import (
 	"os"
 
 	"github.com/pacer/bean-me-up/internal/beans"
-	"github.com/pacer/bean-me-up/internal/frontmatter"
+	"github.com/pacer/bean-me-up/internal/syncstate"
 	"github.com/spf13/cobra"
 )
 
 var unlinkCmd = &cobra.Command{
 	Use:   "unlink <bean-id>",
 	Short: "Remove the link between a bean and its ClickUp task",
-	Long: `Removes the sync.clickup fields from a bean's frontmatter, unlinking
-it from its associated ClickUp task.
+	Long: `Removes the ClickUp sync state for a bean from the sync state file
+(.beans/.sync.json), unlinking it from its associated ClickUp task.
 
 Note: This does not delete or modify the ClickUp task itself.`,
 	Args: cobra.ExactArgs(1),
@@ -28,15 +28,14 @@ Note: This does not delete or modify the ClickUp task itself.`,
 			return fmt.Errorf("bean not found: %s", beanID)
 		}
 
-		// Read the bean file
-		beanFilePath := getBeansPath() + "/" + bean.Path
-		beanFile, err := frontmatter.Read(beanFilePath)
+		// Load sync state store
+		syncStore, err := syncstate.Load(getBeansPath())
 		if err != nil {
-			return fmt.Errorf("reading bean file: %w", err)
+			return fmt.Errorf("loading sync state: %w", err)
 		}
 
 		// Check if linked
-		taskID := beanFile.GetClickUpTaskID()
+		taskID := syncStore.GetTaskID(beanID)
 		if taskID == nil {
 			if jsonOut {
 				return outputUnlinkJSON(bean, "", "not_linked")
@@ -47,10 +46,10 @@ Note: This does not delete or modify the ClickUp task itself.`,
 
 		oldTaskID := *taskID
 
-		// Update the bean file
-		beanFile.ClearClickUpSync()
-		if err := beanFile.Write(); err != nil {
-			return fmt.Errorf("saving bean: %w", err)
+		// Clear the sync state
+		syncStore.Clear(beanID)
+		if err := syncStore.Save(); err != nil {
+			return fmt.Errorf("saving sync state: %w", err)
 		}
 
 		if jsonOut {
