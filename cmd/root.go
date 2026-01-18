@@ -31,8 +31,8 @@ state in .beans/.sync.json without modifying bean files.
 
 Configuration is stored in .beans.clickup.yml in your project directory.`,
 	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
-		// Skip config loading for help commands
-		if cmd.Name() == "help" || cmd.Name() == "completion" {
+		// Skip config loading for help commands and init
+		if cmd.Name() == "help" || cmd.Name() == "completion" || cmd.Name() == "init" {
 			return nil
 		}
 

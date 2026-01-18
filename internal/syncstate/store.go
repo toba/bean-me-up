@@ -128,6 +128,18 @@ func (s *Store) Clear(beanID string) {
 	delete(s.data.Beans, beanID)
 }
 
+// GetAllBeans returns a copy of all bean sync states.
+func (s *Store) GetAllBeans() map[string]*BeanSync {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	result := make(map[string]*BeanSync, len(s.data.Beans))
+	for k, v := range s.data.Beans {
+		result[k] = v
+	}
+	return result
+}
+
 // Save writes the sync state to disk atomically (temp file + rename).
 func (s *Store) Save() error {
 	s.mu.RLock()

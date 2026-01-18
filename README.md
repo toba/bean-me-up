@@ -24,9 +24,36 @@ cd bean-me-up
 go build ./cmd/beanup
 ```
 
-## Setup
+## Quick Start
 
-1. Create a `.beans.clickup.yml` configuration file in your project:
+1. Set the `CLICKUP_TOKEN` environment variable:
+
+```bash
+export CLICKUP_TOKEN="pk_your_clickup_api_token"
+```
+
+Get your API token from: https://app.clickup.com/settings/apps
+
+2. Initialize configuration (recommended):
+
+```bash
+beanup init 123456789
+```
+
+The list ID can be found in the ClickUp URL when viewing a list:
+`app.clickup.com/123456/v/li/987654321` (987654321 is the list ID)
+
+3. Customize the generated `.beans.clickup.yml`
+
+4. Preview sync:
+
+```bash
+beanup sync --dry-run
+```
+
+## Manual Setup
+
+Alternatively, create a `.beans.clickup.yml` configuration file manually:
 
 ```yaml
 beans:
@@ -49,15 +76,7 @@ beans:
         - scrapped
 ```
 
-2. Set the `CLICKUP_TOKEN` environment variable:
-
-```bash
-export CLICKUP_TOKEN="pk_your_clickup_api_token"
-```
-
-3. Find your ClickUp list ID from the URL when viewing the list, or use the ClickUp API.
-
-4. Use helper commands to discover configuration values:
+Use helper commands to discover configuration values:
 
 ```bash
 # List available statuses on your ClickUp list
@@ -71,6 +90,21 @@ beanup users
 ```
 
 ## Usage
+
+### Initialize Configuration
+
+```bash
+# Generate config with list ID as argument
+beanup init 123456789
+
+# Prompt for list ID interactively
+beanup init
+
+# Write to custom output path
+beanup init --output custom.yml 123456789
+```
+
+The init command fetches your list's statuses, custom fields, and workspace members to generate a config file with helpful comments and examples.
 
 ### Sync Beans to ClickUp
 
@@ -113,6 +147,28 @@ beanup status bean-abc1 bean-def2
 # JSON output
 beanup status --json
 ```
+
+### Verify Configuration
+
+```bash
+# Run all checks (configuration, API, sync state)
+beanup check
+
+# Skip ClickUp API checks (offline validation only)
+beanup check --skip-api
+
+# JSON output for CI/scripts
+beanup check --json
+```
+
+The check command validates:
+- Configuration file exists and is parseable
+- List ID is configured and accessible
+- Status/priority mappings match ClickUp list
+- Custom field UUIDs exist (if configured)
+- CLICKUP_TOKEN is valid
+- Sync state file is valid
+- All linked tasks exist in ClickUp
 
 ## How Sync Works
 
