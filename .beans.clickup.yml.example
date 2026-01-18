@@ -29,6 +29,14 @@ beans:
       low: 4
       deferred: 4
 
+    # Optional: Map bean types to ClickUp custom task type IDs
+    # Run `beanup types` to see available task types
+    # type_mapping:
+    #   bug: 1          # Bug
+    #   milestone: 2    # Milestone
+    #   feature: 0      # Task (default)
+    #   task: 0         # Task (default)
+
     # Optional: Map bean fields to ClickUp custom field UUIDs
     # Run `beanup fields` to see available custom fields
     # custom_fields:

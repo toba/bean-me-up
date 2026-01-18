@@ -56,6 +56,12 @@ type configTemplateData struct {
 	Users        []userEntry
 	Statuses     []string
 	CustomFields []fieldEntry
+	CustomItems  []customItemEntry
+}
+
+type customItemEntry struct {
+	Name string
+	ID   int
 }
 
 type userEntry struct {
@@ -178,6 +184,26 @@ func runInit(cmd *cobra.Command, args []string) error {
 		})
 	}
 
+	// Fetch custom task types (optional)
+	_, _ = colorCyan.Print("Fetching custom task types... ")
+	customItems, err := client.GetCustomItems(ctx)
+	if err != nil {
+		_, _ = colorYellow.Println("skipped")
+		_, _ = colorYellow.Fprintf(os.Stderr, "Warning: Could not fetch custom task types: %v\n", err)
+	} else {
+		_, _ = colorGreen.Println("done")
+		for _, item := range customItems {
+			data.CustomItems = append(data.CustomItems, customItemEntry{
+				Name: item.Name,
+				ID:   item.ID,
+			})
+		}
+		// Sort by name for consistent output
+		sort.Slice(data.CustomItems, func(i, j int) bool {
+			return data.CustomItems[i].Name < data.CustomItems[j].Name
+		})
+	}
+
 	// Generate config file
 	_, _ = colorCyan.Print("Generating config file... ")
 	content, err := generateConfig(data)
@@ -264,6 +290,20 @@ beans:
     #   in-progress: "in progress"
     #   completed: "complete"
     #   scrapped: "closed"
+{{if .CustomItems}}
+    # Type mapping: bean type -> ClickUp custom task type ID
+    # This maps bean types (bug, feature, milestone, etc.) to ClickUp task types
+    # Run "beanup types" to see available task types
+    # Available task types:
+{{- range .CustomItems}}
+    #   - "{{.Name}}": {{.ID}}
+{{- end}}
+    # type_mapping:
+    #   bug: 1          # Bug
+    #   milestone: 2    # Milestone
+    #   feature: 0      # Task (default)
+    #   task: 0         # Task (default)
+{{end}}
 {{if .CustomFields}}
     # Custom fields: map bean fields to ClickUp custom field UUIDs
     # Available custom fields on this list:

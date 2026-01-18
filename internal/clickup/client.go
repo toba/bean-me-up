@@ -261,6 +261,48 @@ func (c *Client) GetWorkspaceMembers(ctx context.Context) ([]Member, error) {
 	return members, nil
 }
 
+// GetCustomItems fetches custom task types from all accessible workspaces.
+// Returns custom items with their IDs, names, and descriptions.
+func (c *Client) GetCustomItems(ctx context.Context) ([]CustomItem, error) {
+	// First get all teams to iterate through workspaces
+	teamsURL := fmt.Sprintf("%s/team", baseURL)
+	teamsReq, err := http.NewRequestWithContext(ctx, "GET", teamsURL, nil)
+	if err != nil {
+		return nil, fmt.Errorf("creating teams request: %w", err)
+	}
+
+	var teamsResp teamsResponse
+	if err := c.doRequest(teamsReq, &teamsResp); err != nil {
+		return nil, fmt.Errorf("getting teams: %w", err)
+	}
+
+	// Collect custom items from all teams
+	seen := make(map[int]bool)
+	var items []CustomItem
+	for _, team := range teamsResp.Teams {
+		url := fmt.Sprintf("%s/team/%s/custom_item", baseURL, team.ID)
+		req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
+		if err != nil {
+			return nil, fmt.Errorf("creating request: %w", err)
+		}
+
+		var resp customItemsResponse
+		if err := c.doRequest(req, &resp); err != nil {
+			// Skip teams that don't support custom items
+			continue
+		}
+
+		for _, item := range resp.CustomItems {
+			if !seen[item.ID] {
+				seen[item.ID] = true
+				items = append(items, item)
+			}
+		}
+	}
+
+	return items, nil
+}
+
 // CreateTaskComment creates a comment on a task with structured content (supports mentions).
 func (c *Client) CreateTaskComment(ctx context.Context, taskID string, commentItems []CommentItem) error {
 	url := fmt.Sprintf("%s/task/%s/comment", baseURL, taskID)

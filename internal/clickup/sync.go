@@ -275,6 +275,7 @@ func (s *Syncer) syncBean(ctx context.Context, b *beans.Bean) SyncResult {
 		Priority:            priority,
 		Assignees:           s.getAssignees(ctx),
 		CustomFields:        s.buildCustomFields(b),
+		CustomItemID:        s.getClickUpCustomItemID(b.Type),
 	}
 
 	// Set parent task ID if bean has a parent that's already synced
@@ -532,6 +533,23 @@ func (s *Syncer) getClickUpStatus(beanStatus string) string {
 	}
 
 	return ""
+}
+
+// getClickUpCustomItemID maps a bean type to a ClickUp custom item ID.
+// Returns nil if no mapping exists (task will use default type).
+func (s *Syncer) getClickUpCustomItemID(beanType string) *int {
+	if beanType == "" {
+		return nil
+	}
+
+	// Use custom mapping if configured
+	if s.config != nil && s.config.TypeMapping != nil {
+		if customItemID, ok := s.config.TypeMapping[beanType]; ok {
+			return &customItemID
+		}
+	}
+
+	return nil
 }
 
 // syncRelationships syncs parent/blocking relationships for a bean.

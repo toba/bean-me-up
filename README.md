@@ -68,6 +68,9 @@ beans:
       todo: "to do"
       in-progress: "in progress"
       completed: "complete"
+    type_mapping:                 # Optional: map bean types to ClickUp task types
+      bug: 1                      # Bug task type
+      milestone: 2                # Milestone task type
     custom_fields:                # Optional: map bean fields to ClickUp fields
       bean_id: "field-uuid"
       created_at: "field-uuid"
@@ -90,6 +93,9 @@ beanup fields
 
 # List workspace members and their IDs
 beanup users
+
+# List custom task types and their IDs
+beanup types
 ```
 
 ## Usage
@@ -168,6 +174,7 @@ The check command validates:
 - Configuration file exists and is parseable
 - List ID is configured and accessible
 - Status/priority mappings match ClickUp list
+- Type mapping is configured (warning if not)
 - Custom field UUIDs exist (if configured)
 - CLICKUP_TOKEN is valid
 - Sync state file is valid
@@ -179,6 +186,7 @@ The check command validates:
    - Title and description from the bean
    - Status mapped according to `status_mapping`
    - Priority mapped (critical→Urgent, high→High, etc.)
+   - Task type mapped according to `type_mapping` (bug→Bug, milestone→Milestone, etc.)
    - Parent/subtask relationships if the parent bean is also synced
    - Custom fields if configured
 
@@ -241,6 +249,20 @@ priority_mapping:
   low: 4
   deferred: 4
 ```
+
+### `beans.clickup.type_mapping`
+
+Map bean types to ClickUp custom task type IDs. Use `beanup types` to see available task types in your workspace:
+
+```yaml
+type_mapping:
+  bug: 1          # Bug
+  milestone: 2    # Milestone
+  feature: 0      # Task (default, ID 0 or omit)
+  task: 0         # Task (default)
+```
+
+Bean types without a mapping will create regular tasks.
 
 ### `beans.clickup.custom_fields`
 

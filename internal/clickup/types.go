@@ -31,9 +31,10 @@ type CreateTaskRequest struct {
 	MarkdownDescription string        `json:"markdown_description,omitempty"`
 	Status              string        `json:"status,omitempty"`
 	Priority            *int          `json:"priority,omitempty"`
-	Assignees           []int         `json:"assignees,omitempty"` // User IDs to assign
-	Parent              *string       `json:"parent,omitempty"`    // Parent task ID for subtasks
+	Assignees           []int         `json:"assignees,omitempty"`      // User IDs to assign
+	Parent              *string       `json:"parent,omitempty"`         // Parent task ID for subtasks
 	CustomFields        []CustomField `json:"custom_fields,omitempty"`
+	CustomItemID        *int          `json:"custom_item_id,omitempty"` // Custom task type ID (e.g., Bug, Milestone)
 }
 
 // CustomField represents a custom field value for task creation/update.
@@ -168,4 +169,21 @@ type AuthorizedUser struct {
 // userResponse is the API response for getting the authorized user.
 type userResponse struct {
 	User AuthorizedUser `json:"user"`
+}
+
+// CustomItem represents a custom task type in ClickUp.
+type CustomItem struct {
+	ID          int    `json:"id"`
+	Name        string `json:"name"`
+	NamePlural  string `json:"name_plural"`
+	Description string `json:"description"`
+	Avatar      *struct {
+		Source *string `json:"source"`
+		Value  *string `json:"value"`
+	} `json:"avatar"`
+}
+
+// customItemsResponse is the API response for getting custom task types.
+type customItemsResponse struct {
+	CustomItems []CustomItem `json:"custom_items"`
 }

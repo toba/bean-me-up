@@ -22,7 +22,7 @@ var checkCmd = &cobra.Command{
 Checks include:
   - Configuration file exists and is parseable
   - List ID is configured and accessible
-  - Status and priority mappings are valid
+  - Status, priority, and type mappings are valid
   - Custom fields exist on the ClickUp list (if configured)
   - CLICKUP_TOKEN is set and valid
   - Sync state file is valid
@@ -247,6 +247,21 @@ func checkConfiguration(ctx context.Context) checkSection {
 			Name:    "Priority mapping valid",
 			Status:  checkPass,
 			Message: fmt.Sprintf("%d mappings", len(priorityMapping)),
+		})
+	}
+
+	// Check type mapping
+	if len(cfg.Beans.ClickUp.TypeMapping) > 0 {
+		section.Checks = append(section.Checks, checkResult{
+			Name:    "Type mapping configured",
+			Status:  checkPass,
+			Message: fmt.Sprintf("%d mappings", len(cfg.Beans.ClickUp.TypeMapping)),
+		})
+	} else {
+		section.Checks = append(section.Checks, checkResult{
+			Name:    "Type mapping configured",
+			Status:  checkWarn,
+			Message: "Not configured (bean types won't map to ClickUp task types)",
 		})
 	}
 
