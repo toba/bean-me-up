@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
 
 	"github.com/STR-Consulting/bean-me-up/internal/config"
 	"github.com/spf13/cobra"
@@ -52,7 +53,7 @@ Configuration is stored in .beans.clickup.yml in your project directory.`,
 			if err != nil {
 				return fmt.Errorf("loading config: %w", err)
 			}
-			configDir = cwd
+			configDir = filepath.Dir(cfgFile)
 		} else {
 			cfg, configDir, err = config.LoadFromDirectory(cwd)
 			if err != nil {
@@ -70,7 +71,7 @@ func Execute() error {
 }
 
 func init() {
-	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default: .beans.clickup.yml)")
+	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "Path to config file (default: searches upward for .beans.clickup.yml)")
 	rootCmd.PersistentFlags().StringVar(&beansPath, "beans-path", "", "path to beans directory (default: from .beans.yml)")
 	rootCmd.PersistentFlags().BoolVar(&jsonOut, "json", false, "output as JSON")
 }
