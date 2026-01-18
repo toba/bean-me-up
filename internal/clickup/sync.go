@@ -584,6 +584,27 @@ func (s *Syncer) syncRelationships(ctx context.Context, b *beans.Bean) error {
 	return nil
 }
 
+// FilterBeansNeedingSync returns only beans that need to be synced based on timestamps.
+// A bean needs sync if: force is true, it has no sync record, or it was updated after last sync.
+func FilterBeansNeedingSync(beanList []beans.Bean, store *syncstate.Store, force bool) []beans.Bean {
+	var needSync []beans.Bean
+	for _, b := range beanList {
+		if force {
+			needSync = append(needSync, b)
+			continue
+		}
+		syncedAt := store.GetSyncedAt(b.ID)
+		if syncedAt == nil {
+			needSync = append(needSync, b) // Never synced
+			continue
+		}
+		if b.UpdatedAt != nil && b.UpdatedAt.After(*syncedAt) {
+			needSync = append(needSync, b) // Updated since last sync
+		}
+	}
+	return needSync
+}
+
 // FilterBeansForSync filters beans based on sync filter configuration.
 func FilterBeansForSync(beanList []beans.Bean, filter *config.SyncFilter) []beans.Bean {
 	if filter == nil {

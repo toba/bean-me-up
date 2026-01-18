@@ -79,6 +79,17 @@ Requires CLICKUP_TOKEN environment variable to be set.`,
 			return nil
 		}
 
+		// Pre-filter to beans that actually need syncing
+		beansToSync := clickup.FilterBeansNeedingSync(beanList, syncStore, syncForce)
+		if len(beansToSync) == 0 {
+			if jsonOut {
+				fmt.Println("[]")
+				return nil
+			}
+			fmt.Println("All beans up to date")
+			return nil
+		}
+
 		// Create syncer with progress callback
 		opts := clickup.SyncOptions{
 			DryRun:          syncDryRun,
@@ -88,13 +99,17 @@ Requires CLICKUP_TOKEN environment variable to be set.`,
 		}
 
 		// Show progress unless JSON output is requested
+		// Only show dots for 5+ beans to avoid clutter
 		if !jsonOut {
-			fmt.Printf("Syncing %d beans to ClickUp ", len(beanList))
-			opts.OnProgress = func(result clickup.SyncResult, completed, total int) {
-				if result.Error != nil {
-					fmt.Print("x")
-				} else {
-					fmt.Print(".")
+			fmt.Printf("Syncing %d beans to ClickUp", len(beansToSync))
+			if len(beansToSync) >= 5 {
+				fmt.Print(" ")
+				opts.OnProgress = func(result clickup.SyncResult, completed, total int) {
+					if result.Error != nil {
+						fmt.Print("x")
+					} else {
+						fmt.Print(".")
+					}
 				}
 			}
 		}
@@ -102,7 +117,7 @@ Requires CLICKUP_TOKEN environment variable to be set.`,
 		syncer := clickup.NewSyncer(client, &cfg.Beans.ClickUp, opts, getBeansPath(), syncStore)
 
 		// Run sync
-		results, err := syncer.SyncBeans(ctx, beanList)
+		results, err := syncer.SyncBeans(ctx, beansToSync)
 
 		// Print newline after progress dots
 		if !jsonOut {
