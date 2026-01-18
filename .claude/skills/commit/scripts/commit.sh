@@ -2,6 +2,7 @@
 # Unified commit workflow script
 # Usage: commit.sh "subject" "description" [NEW_VERSION]
 # Example: commit.sh "add user auth" "implements JWT-based auth flow" v1.2.0
+# Set PUSH=true to push commits and create releases
 
 set -euo pipefail
 
@@ -15,6 +16,9 @@ if [ -z "$SUBJECT" ]; then
     echo "  subject     - Commit subject line (required)"
     echo "  description - Commit description (optional, use empty string if skipping)"
     echo "  NEW_VERSION - Version tag to create, e.g., v1.2.0 (optional)"
+    echo ""
+    echo "Environment variables:"
+    echo "  PUSH=true   - Push commits and create releases (default: local only)"
     exit 1
 fi
 
@@ -101,13 +105,9 @@ echo "=== Creating commit ==="
 if [ -n "$DESCRIPTION" ]; then
     COMMIT_MSG="$SUBJECT
 
-$DESCRIPTION
-
-Co-Authored-By: Claude <noreply@anthropic.com>"
+$DESCRIPTION"
 else
-    COMMIT_MSG="$SUBJECT
-
-Co-Authored-By: Claude <noreply@anthropic.com>"
+    COMMIT_MSG="$SUBJECT"
 fi
 
 git commit -m "$COMMIT_MSG"
@@ -121,18 +121,27 @@ else
     echo "Skipping beanup sync (not configured)"
 fi
 
-# === Push commit ===
-echo ""
-echo "=== Pushing to remote ==="
-git push
-
-# === Version release ===
-if [ -n "$NEW_VERSION" ]; then
+# === Push and release (only if PUSH=true) ===
+if [ "${PUSH:-}" = "true" ]; then
     echo ""
-    echo "=== Tagging release $NEW_VERSION ==="
-    git tag -a "$NEW_VERSION" -m "Release $NEW_VERSION"
-    git push --tags
-    echo "Tag $NEW_VERSION pushed - GoReleaser will create the release via GitHub Actions"
+    echo "=== Pushing to remote ==="
+    git push
+
+    # Version release
+    if [ -n "$NEW_VERSION" ]; then
+        echo ""
+        echo "=== Tagging release $NEW_VERSION ==="
+        git tag -a "$NEW_VERSION" -m "Release $NEW_VERSION"
+        git push --tags
+        echo "Tag $NEW_VERSION pushed - GoReleaser will create the release via GitHub Actions"
+    fi
+else
+    echo ""
+    echo "=== Commit is local only ==="
+    echo "Use PUSH=true to push commits and create releases"
+    if [ -n "$NEW_VERSION" ]; then
+        echo "NEW_VERSION=$NEW_VERSION will be used when pushed"
+    fi
 fi
 
 echo ""

@@ -1,9 +1,12 @@
 ---
 name: commit
 description: Stage all changes and commit with a descriptive message. Use when the user asks to commit, save changes, or says "/commit".
+args: "[push]"
 ---
 
 ## Workflow
+
+**IMPORTANT**: Only use `PUSH=true` when the user explicitly says "/commit push" or asks to push. Plain "/commit" should NEVER push.
 
 1. Review changes and current version:
    ```bash
@@ -22,14 +25,17 @@ description: Stage all changes and commit with a descriptive message. Use when t
 
 4. Run commit script:
    ```bash
-   # Without version bump:
+   # Local commit only (no push, no release):
    .claude/skills/commit/scripts/commit.sh "subject" "description"
 
-   # With version bump:
-   .claude/skills/commit/scripts/commit.sh "subject" "description" vX.Y.Z
+   # Push and release with version bump:
+   PUSH=true .claude/skills/commit/scripts/commit.sh "subject" "description" vX.Y.Z
+
+   # Push without version bump:
+   PUSH=true .claude/skills/commit/scripts/commit.sh "subject" "description"
 
    # Subject only (no description):
    .claude/skills/commit/scripts/commit.sh "subject" ""
    ```
 
-The script handles everything: lint, test, gitignore check, stage, commit, sync beans, push, and release (if version provided).
+The script handles: lint, test, gitignore check, stage, commit, and sync beans. Push and release only happen when `PUSH=true`.

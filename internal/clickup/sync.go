@@ -396,22 +396,33 @@ func (s *Syncer) buildCustomFields(b *beans.Bean) []CustomField {
 	}
 
 	// Created at field (date - Unix milliseconds)
+	// Convert to local date at midnight to avoid timezone display issues in ClickUp
 	if cf.CreatedAt != "" && b.CreatedAt != nil {
 		fields = append(fields, CustomField{
 			ID:    cf.CreatedAt,
-			Value: b.CreatedAt.UnixMilli(),
+			Value: toLocalDateMillis(*b.CreatedAt),
 		})
 	}
 
 	// Updated at field (date - Unix milliseconds)
+	// Convert to local date at midnight to avoid timezone display issues in ClickUp
 	if cf.UpdatedAt != "" && b.UpdatedAt != nil {
 		fields = append(fields, CustomField{
 			ID:    cf.UpdatedAt,
-			Value: b.UpdatedAt.UnixMilli(),
+			Value: toLocalDateMillis(*b.UpdatedAt),
 		})
 	}
 
 	return fields
+}
+
+// toLocalDateMillis converts a timestamp to midnight of that date in local timezone.
+// This ensures ClickUp displays the date the user expects (the local date when the bean
+// was created) rather than potentially showing "Tomorrow" due to UTC offset.
+func toLocalDateMillis(t time.Time) int64 {
+	local := t.Local()
+	midnight := time.Date(local.Year(), local.Month(), local.Day(), 0, 0, 0, 0, time.Local)
+	return midnight.UnixMilli()
 }
 
 // createMentionComment creates a task comment with @mentions for the given usernames.
@@ -488,15 +499,17 @@ func (s *Syncer) updateCustomFields(ctx context.Context, taskID string, b *beans
 	}
 
 	// Created at field (date - Unix milliseconds)
+	// Convert to local date at midnight to avoid timezone display issues in ClickUp
 	if cf.CreatedAt != "" && b.CreatedAt != nil {
-		if err := s.client.SetCustomFieldValue(ctx, taskID, cf.CreatedAt, b.CreatedAt.UnixMilli()); err != nil {
+		if err := s.client.SetCustomFieldValue(ctx, taskID, cf.CreatedAt, toLocalDateMillis(*b.CreatedAt)); err != nil {
 			return fmt.Errorf("setting created_at field: %w", err)
 		}
 	}
 
 	// Updated at field (date - Unix milliseconds)
+	// Convert to local date at midnight to avoid timezone display issues in ClickUp
 	if cf.UpdatedAt != "" && b.UpdatedAt != nil {
-		if err := s.client.SetCustomFieldValue(ctx, taskID, cf.UpdatedAt, b.UpdatedAt.UnixMilli()); err != nil {
+		if err := s.client.SetCustomFieldValue(ctx, taskID, cf.UpdatedAt, toLocalDateMillis(*b.UpdatedAt)); err != nil {
 			return fmt.Errorf("setting updated_at field: %w", err)
 		}
 	}
