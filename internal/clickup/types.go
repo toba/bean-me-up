@@ -3,12 +3,27 @@ package clickup
 
 // TaskInfo holds task data returned from ClickUp.
 type TaskInfo struct {
-	ID          string  `json:"id"`
-	Name        string  `json:"name"`
-	Description string  `json:"description"`
-	Status      Status  `json:"status"`
-	URL         string  `json:"url"`
-	Parent      *string `json:"parent"` // Parent task ID if subtask
+	ID           string             `json:"id"`
+	Name         string             `json:"name"`
+	Description  string             `json:"description"`
+	Status       Status             `json:"status"`
+	URL          string             `json:"url"`
+	Parent       *string            `json:"parent"`         // Parent task ID if subtask
+	Priority     *TaskPriority      `json:"priority"`       // ClickUp priority (nil = no priority)
+	CustomItemID *int               `json:"custom_item_id"` // Custom task type ID
+	CustomFields []TaskCustomField  `json:"custom_fields"`  // Custom field values
+}
+
+// TaskPriority represents a ClickUp task priority.
+type TaskPriority struct {
+	ID int `json:"id,string"` // Priority ID as string in JSON, parsed as int
+}
+
+// TaskCustomField represents a custom field value on a task.
+type TaskCustomField struct {
+	ID    string `json:"id"`
+	Name  string `json:"name"`
+	Value any    `json:"value"` // Can be string, number, etc. depending on field type
 }
 
 // Status represents a ClickUp task status.
@@ -54,6 +69,17 @@ type UpdateTaskRequest struct {
 	CustomItemID        *int    `json:"custom_item_id,omitempty"` // Custom task type ID (e.g., Bug, Milestone)
 }
 
+// hasChanges returns true if any field in the update request is set.
+func (u *UpdateTaskRequest) hasChanges() bool {
+	return u.Name != nil ||
+		u.Description != nil ||
+		u.MarkdownDescription != nil ||
+		u.Status != nil ||
+		u.Priority != nil ||
+		u.Parent != nil ||
+		u.CustomItemID != nil
+}
+
 // Dependency represents a task dependency in ClickUp.
 type Dependency struct {
 	TaskID      string `json:"task_id"`
@@ -71,23 +97,29 @@ type AddDependencyRequest struct {
 
 // taskResponse is the API response wrapper for task operations.
 type taskResponse struct {
-	ID          string  `json:"id"`
-	Name        string  `json:"name"`
-	Description string  `json:"description"`
-	Status      Status  `json:"status"`
-	URL         string  `json:"url"`
-	Parent      *string `json:"parent"`
+	ID           string            `json:"id"`
+	Name         string            `json:"name"`
+	Description  string            `json:"description"`
+	Status       Status            `json:"status"`
+	URL          string            `json:"url"`
+	Parent       *string           `json:"parent"`
+	Priority     *TaskPriority     `json:"priority"`
+	CustomItemID *int              `json:"custom_item_id"`
+	CustomFields []TaskCustomField `json:"custom_fields"`
 }
 
 // toTaskInfo converts a taskResponse to a TaskInfo.
 func (r *taskResponse) toTaskInfo() *TaskInfo {
 	return &TaskInfo{
-		ID:          r.ID,
-		Name:        r.Name,
-		Description: r.Description,
-		Status:      r.Status,
-		URL:         r.URL,
-		Parent:      r.Parent,
+		ID:           r.ID,
+		Name:         r.Name,
+		Description:  r.Description,
+		Status:       r.Status,
+		URL:          r.URL,
+		Parent:       r.Parent,
+		Priority:     r.Priority,
+		CustomItemID: r.CustomItemID,
+		CustomFields: r.CustomFields,
 	}
 }
 

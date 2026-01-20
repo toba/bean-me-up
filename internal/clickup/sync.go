@@ -230,35 +230,31 @@ func (s *Syncer) syncBean(ctx context.Context, b *beans.Bean) SyncResult {
 				return result
 			}
 
-			// Update the task using markdown_description
-			update := &UpdateTaskRequest{
-				Name:                &b.Title,
-				MarkdownDescription: &description,
-				Priority:            priority,
-				CustomItemID:        s.getClickUpCustomItemID(b.Type),
-			}
-			if clickUpStatus != "" {
-				update.Status = &clickUpStatus
+			// Build update request with only changed fields
+			update := s.buildUpdateRequest(task, b, description, priority, clickUpStatus)
+
+			// Check if any core fields changed
+			if update.hasChanges() {
+				updatedTask, err := s.client.UpdateTask(ctx, *taskID, update)
+				if err != nil {
+					result.Action = "error"
+					result.Error = fmt.Errorf("updating task: %w", err)
+					return result
+				}
+				result.TaskURL = updatedTask.URL
 			}
 
-			updatedTask, err := s.client.UpdateTask(ctx, *taskID, update)
-			if err != nil {
-				result.Action = "error"
-				result.Error = fmt.Errorf("updating task: %w", err)
-				return result
-			}
-
-			// Update custom fields (best-effort)
-			if err := s.updateCustomFields(ctx, *taskID, b); err != nil {
-				// Log but don't fail
-				_ = err
-			}
+			// Update custom fields only if changed (best-effort)
+			customFieldsUpdated := s.updateChangedCustomFields(ctx, task, *taskID, b)
 
 			// Update synced_at timestamp in sync store
 			s.syncStore.SetSyncedAt(b.ID, time.Now().UTC())
 
-			result.TaskURL = updatedTask.URL
-			result.Action = "updated"
+			if update.hasChanges() || customFieldsUpdated {
+				result.Action = "updated"
+			} else {
+				result.Action = "unchanged"
+			}
 			return result
 		}
 	}
@@ -485,38 +481,132 @@ func (s *Syncer) getAssignees(ctx context.Context) []int {
 	return []int{user.ID}
 }
 
-// updateCustomFields updates custom fields on an existing task.
-func (s *Syncer) updateCustomFields(ctx context.Context, taskID string, b *beans.Bean) error {
+// buildUpdateRequest builds an UpdateTaskRequest containing only fields that differ from current.
+func (s *Syncer) buildUpdateRequest(current *TaskInfo, b *beans.Bean, description string, priority *int, clickUpStatus string) *UpdateTaskRequest {
+	update := &UpdateTaskRequest{}
+
+	// Only include name if changed
+	if current.Name != b.Title {
+		update.Name = &b.Title
+	}
+
+	// Only include description if changed
+	if current.Description != description {
+		update.MarkdownDescription = &description
+	}
+
+	// Only include priority if changed
+	if !s.priorityEqual(current.Priority, priority) {
+		update.Priority = priority
+	}
+
+	// Only include status if changed
+	if clickUpStatus != "" && current.Status.Status != clickUpStatus {
+		update.Status = &clickUpStatus
+	}
+
+	// Only include custom item ID if changed
+	newItemID := s.getClickUpCustomItemID(b.Type)
+	if !intPtrEqual(current.CustomItemID, newItemID) {
+		update.CustomItemID = newItemID
+	}
+
+	return update
+}
+
+// priorityEqual compares a TaskPriority (from ClickUp response) with a target priority int pointer.
+func (s *Syncer) priorityEqual(current *TaskPriority, target *int) bool {
+	if current == nil && target == nil {
+		return true
+	}
+	if current == nil || target == nil {
+		return false
+	}
+	return current.ID == *target
+}
+
+// intPtrEqual compares two int pointers for equality.
+func intPtrEqual(a, b *int) bool {
+	if a == nil && b == nil {
+		return true
+	}
+	if a == nil || b == nil {
+		return false
+	}
+	return *a == *b
+}
+
+// updateChangedCustomFields updates only custom fields that have changed.
+// Returns true if any field was updated.
+func (s *Syncer) updateChangedCustomFields(ctx context.Context, current *TaskInfo, taskID string, b *beans.Bean) bool {
 	if s.config == nil || s.config.CustomFields == nil {
-		return nil
+		return false
 	}
 
 	cf := s.config.CustomFields
+	updated := false
+
+	// Build a map of current custom field values by ID for quick lookup
+	currentFields := make(map[string]any)
+	for _, f := range current.CustomFields {
+		currentFields[f.ID] = f.Value
+	}
 
 	// Bean ID field (text)
 	if cf.BeanID != "" {
-		if err := s.client.SetCustomFieldValue(ctx, taskID, cf.BeanID, b.ID); err != nil {
-			return fmt.Errorf("setting bean_id field: %w", err)
+		currentVal, _ := currentFields[cf.BeanID].(string)
+		if currentVal != b.ID {
+			if err := s.client.SetCustomFieldValue(ctx, taskID, cf.BeanID, b.ID); err == nil {
+				updated = true
+			}
 		}
 	}
 
 	// Created at field (date - Unix milliseconds)
-	// Convert to local date at midnight to avoid timezone display issues in ClickUp
 	if cf.CreatedAt != "" && b.CreatedAt != nil {
-		if err := s.client.SetCustomFieldValue(ctx, taskID, cf.CreatedAt, toLocalDateMillis(*b.CreatedAt)); err != nil {
-			return fmt.Errorf("setting created_at field: %w", err)
+		newVal := toLocalDateMillis(*b.CreatedAt)
+		if !customFieldDateEqual(currentFields[cf.CreatedAt], newVal) {
+			if err := s.client.SetCustomFieldValue(ctx, taskID, cf.CreatedAt, newVal); err == nil {
+				updated = true
+			}
 		}
 	}
 
 	// Updated at field (date - Unix milliseconds)
-	// Convert to local date at midnight to avoid timezone display issues in ClickUp
 	if cf.UpdatedAt != "" && b.UpdatedAt != nil {
-		if err := s.client.SetCustomFieldValue(ctx, taskID, cf.UpdatedAt, toLocalDateMillis(*b.UpdatedAt)); err != nil {
-			return fmt.Errorf("setting updated_at field: %w", err)
+		newVal := toLocalDateMillis(*b.UpdatedAt)
+		if !customFieldDateEqual(currentFields[cf.UpdatedAt], newVal) {
+			if err := s.client.SetCustomFieldValue(ctx, taskID, cf.UpdatedAt, newVal); err == nil {
+				updated = true
+			}
 		}
 	}
 
-	return nil
+	return updated
+}
+
+// customFieldDateEqual compares a custom field date value (from ClickUp, can be string or number)
+// with a target milliseconds value.
+func customFieldDateEqual(current any, target int64) bool {
+	if current == nil {
+		return false
+	}
+
+	// ClickUp returns date fields as string timestamps in milliseconds
+	switch v := current.(type) {
+	case string:
+		// Parse string to int64
+		var parsed int64
+		if _, err := fmt.Sscanf(v, "%d", &parsed); err == nil {
+			return parsed == target
+		}
+	case float64:
+		// JSON numbers are decoded as float64
+		return int64(v) == target
+	case int64:
+		return v == target
+	}
+	return false
 }
 
 // getClickUpStatus maps a bean status to a ClickUp status name.
