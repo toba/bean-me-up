@@ -49,7 +49,7 @@ Requires CLICKUP_TOKEN environment variable to be set.`,
 		// Check for legacy .sync.json and warn
 		syncFilePath := filepath.Join(getBeansPath(), syncstate.SyncFileName)
 		if _, err := os.Stat(syncFilePath); err == nil {
-			fmt.Fprintln(os.Stderr, "Warning: Legacy .sync.json found. Run 'beanup migrate' to migrate sync state to bean external metadata.")
+			fmt.Fprintln(os.Stderr, "Warning: Legacy .sync.json found. Run 'beanup migrate' to migrate sync state to bean extension metadata.")
 		}
 
 		// Create clients
@@ -82,8 +82,8 @@ Requires CLICKUP_TOKEN environment variable to be set.`,
 			return nil
 		}
 
-		// Create sync state provider from bean external metadata
-		syncProvider := clickup.NewExternalSyncProvider(beansClient, beanList)
+		// Create sync state provider from bean extension metadata
+		syncProvider := clickup.NewExtensionSyncProvider(beansClient, beanList)
 
 		// Pre-filter to beans that actually need syncing
 		beansToSync := clickup.FilterBeansNeedingSync(beanList, syncProvider, syncForce)
@@ -133,7 +133,7 @@ Requires CLICKUP_TOKEN environment variable to be set.`,
 			return fmt.Errorf("sync failed: %w", err)
 		}
 
-		// Flush sync state to bean external metadata
+		// Flush sync state to bean extension metadata
 		if !syncDryRun {
 			if flushErr := syncProvider.Flush(); flushErr != nil {
 				return fmt.Errorf("saving sync state: %w", flushErr)

@@ -17,8 +17,8 @@ type SyncStateProvider interface {
 	Flush() error
 }
 
-// externalCache holds cached sync state for a single bean.
-type externalCache struct {
+// extensionCache holds cached sync state for a single bean.
+type extensionCache struct {
 	taskID   string
 	syncedAt *time.Time
 }
@@ -26,30 +26,30 @@ type externalCache struct {
 // pendingOp represents a pending write operation.
 type pendingOp struct {
 	beanID string
-	set    *beans.ExternalDataOp // nil means remove
+	set    *beans.ExtensionDataOp // nil means remove
 }
 
-// ExternalSyncProvider implements SyncStateProvider using beans' external metadata.
-type ExternalSyncProvider struct {
+// ExtensionSyncProvider implements SyncStateProvider using beans' extension metadata.
+type ExtensionSyncProvider struct {
 	client *beans.Client
 	mu     sync.RWMutex
-	cache  map[string]*externalCache
+	cache  map[string]*extensionCache
 	ops    []pendingOp
 }
 
-// NewExternalSyncProvider creates a provider pre-populated from a bean list.
-func NewExternalSyncProvider(client *beans.Client, beanList []beans.Bean) *ExternalSyncProvider {
-	p := &ExternalSyncProvider{
+// NewExtensionSyncProvider creates a provider pre-populated from a bean list.
+func NewExtensionSyncProvider(client *beans.Client, beanList []beans.Bean) *ExtensionSyncProvider {
+	p := &ExtensionSyncProvider{
 		client: client,
-		cache:  make(map[string]*externalCache, len(beanList)),
+		cache:  make(map[string]*extensionCache, len(beanList)),
 	}
 
 	for _, b := range beanList {
-		taskID := b.GetExternalString(beans.PluginClickUp, beans.ExtKeyTaskID)
-		syncedAt := b.GetExternalTime(beans.PluginClickUp, beans.ExtKeySyncedAt)
+		taskID := b.GetExtensionString(beans.PluginClickUp, beans.ExtKeyTaskID)
+		syncedAt := b.GetExtensionTime(beans.PluginClickUp, beans.ExtKeySyncedAt)
 
 		if taskID != "" || syncedAt != nil {
-			p.cache[b.ID] = &externalCache{
+			p.cache[b.ID] = &extensionCache{
 				taskID:   taskID,
 				syncedAt: syncedAt,
 			}
@@ -59,7 +59,7 @@ func NewExternalSyncProvider(client *beans.Client, beanList []beans.Bean) *Exter
 	return p
 }
 
-func (p *ExternalSyncProvider) GetTaskID(beanID string) *string {
+func (p *ExtensionSyncProvider) GetTaskID(beanID string) *string {
 	p.mu.RLock()
 	defer p.mu.RUnlock()
 
@@ -70,7 +70,7 @@ func (p *ExternalSyncProvider) GetTaskID(beanID string) *string {
 	return &c.taskID
 }
 
-func (p *ExternalSyncProvider) GetSyncedAt(beanID string) *time.Time {
+func (p *ExtensionSyncProvider) GetSyncedAt(beanID string) *time.Time {
 	p.mu.RLock()
 	defer p.mu.RUnlock()
 
@@ -81,30 +81,30 @@ func (p *ExternalSyncProvider) GetSyncedAt(beanID string) *time.Time {
 	return c.syncedAt
 }
 
-func (p *ExternalSyncProvider) SetTaskID(beanID, taskID string) {
+func (p *ExtensionSyncProvider) SetTaskID(beanID, taskID string) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 
 	if p.cache[beanID] == nil {
-		p.cache[beanID] = &externalCache{}
+		p.cache[beanID] = &extensionCache{}
 	}
 	p.cache[beanID].taskID = taskID
 	p.appendSetOp(beanID)
 }
 
-func (p *ExternalSyncProvider) SetSyncedAt(beanID string, t time.Time) {
+func (p *ExtensionSyncProvider) SetSyncedAt(beanID string, t time.Time) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 
 	utc := t.UTC()
 	if p.cache[beanID] == nil {
-		p.cache[beanID] = &externalCache{}
+		p.cache[beanID] = &extensionCache{}
 	}
 	p.cache[beanID].syncedAt = &utc
 	p.appendSetOp(beanID)
 }
 
-func (p *ExternalSyncProvider) Clear(beanID string) {
+func (p *ExtensionSyncProvider) Clear(beanID string) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 
@@ -114,7 +114,7 @@ func (p *ExternalSyncProvider) Clear(beanID string) {
 
 // Flush writes all pending operations to beans via GraphQL.
 // Set operations are batched; remove operations are executed individually.
-func (p *ExternalSyncProvider) Flush() error {
+func (p *ExtensionSyncProvider) Flush() error {
 	p.mu.Lock()
 	ops := p.ops
 	p.ops = nil
@@ -131,7 +131,7 @@ func (p *ExternalSyncProvider) Flush() error {
 	}
 
 	// Collect final set ops and remove ops
-	var setOps []beans.ExternalDataOp
+	var setOps []beans.ExtensionDataOp
 	var removeIDs []string
 
 	for beanID, idx := range seen {
@@ -145,14 +145,14 @@ func (p *ExternalSyncProvider) Flush() error {
 
 	// Batch set operations
 	if len(setOps) > 0 {
-		if err := p.client.SetExternalDataBatch(setOps); err != nil {
+		if err := p.client.SetExtensionDataBatch(setOps); err != nil {
 			return err
 		}
 	}
 
 	// Remove operations individually
 	for _, id := range removeIDs {
-		if err := p.client.RemoveExternalData(id, beans.PluginClickUp); err != nil {
+		if err := p.client.RemoveExtensionData(id, beans.PluginClickUp); err != nil {
 			return err
 		}
 	}
@@ -162,7 +162,7 @@ func (p *ExternalSyncProvider) Flush() error {
 
 // appendSetOp adds or updates a pending set operation for the given bean.
 // Must be called with p.mu held for writing.
-func (p *ExternalSyncProvider) appendSetOp(beanID string) {
+func (p *ExtensionSyncProvider) appendSetOp(beanID string) {
 	c := p.cache[beanID]
 	data := map[string]any{
 		beans.ExtKeyTaskID: c.taskID,
@@ -173,9 +173,9 @@ func (p *ExternalSyncProvider) appendSetOp(beanID string) {
 
 	p.ops = append(p.ops, pendingOp{
 		beanID: beanID,
-		set: &beans.ExternalDataOp{
+		set: &beans.ExtensionDataOp{
 			BeanID: beanID,
-			Plugin: beans.PluginClickUp,
+			Name:   beans.PluginClickUp,
 			Data:   data,
 		},
 	})

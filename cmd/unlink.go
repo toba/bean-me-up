@@ -10,7 +10,7 @@ import (
 var unlinkCmd = &cobra.Command{
 	Use:   "unlink <bean-id>",
 	Short: "Remove the link between a bean and its ClickUp task",
-	Long: `Removes the ClickUp sync metadata from a bean's external data,
+	Long: `Removes the ClickUp sync metadata from a bean's extension data,
 unlinking it from its associated ClickUp task.
 
 Note: This does not delete or modify the ClickUp task itself.`,
@@ -26,7 +26,7 @@ Note: This does not delete or modify the ClickUp task itself.`,
 		}
 
 		// Check if linked
-		taskID := bean.GetExternalString(beans.PluginClickUp, beans.ExtKeyTaskID)
+		taskID := bean.GetExtensionString(beans.PluginClickUp, beans.ExtKeyTaskID)
 		if taskID == "" {
 			if jsonOut {
 				return outputUnlinkJSON(bean, "", "not_linked")
@@ -36,7 +36,7 @@ Note: This does not delete or modify the ClickUp task itself.`,
 		}
 
 		// Remove external data
-		if err := beansClient.RemoveExternalData(beanID, beans.PluginClickUp); err != nil {
+		if err := beansClient.RemoveExtensionData(beanID, beans.PluginClickUp); err != nil {
 			return fmt.Errorf("removing sync state: %w", err)
 		}
 

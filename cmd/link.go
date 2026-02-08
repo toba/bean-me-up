@@ -14,7 +14,7 @@ var linkCmd = &cobra.Command{
 	Use:   "link <bean-id> <task-id>",
 	Short: "Link a bean to an existing ClickUp task",
 	Long: `Manually links a bean to an existing ClickUp task by storing
-the task ID in the bean's external metadata.
+the task ID in the bean's extension metadata.
 
 This is useful when you have an existing ClickUp task that you want to
 associate with a bean, or when syncing fails and you need to fix the link.`,
@@ -31,7 +31,7 @@ associate with a bean, or when syncing fails and you need to fix the link.`,
 		}
 
 		// Check if already linked to this task
-		existingTaskID := bean.GetExternalString(beans.PluginClickUp, beans.ExtKeyTaskID)
+		existingTaskID := bean.GetExtensionString(beans.PluginClickUp, beans.ExtKeyTaskID)
 		if existingTaskID == taskID {
 			if jsonOut {
 				return outputLinkJSON(bean, taskID, "already_linked")
@@ -56,7 +56,7 @@ associate with a bean, or when syncing fails and you need to fix the link.`,
 			beans.ExtKeyTaskID:   taskID,
 			beans.ExtKeySyncedAt: time.Now().UTC().Format(time.RFC3339),
 		}
-		if err := beansClient.SetExternalData(beanID, beans.PluginClickUp, data); err != nil {
+		if err := beansClient.SetExtensionData(beanID, beans.PluginClickUp, data); err != nil {
 			return fmt.Errorf("saving sync state: %w", err)
 		}
 

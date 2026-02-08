@@ -36,9 +36,9 @@ status for all beans that are linked to ClickUp tasks.`,
 			if err != nil {
 				return fmt.Errorf("listing beans: %w", err)
 			}
-			// Filter to only beans with ClickUp external data
+			// Filter to only beans with ClickUp extension data
 			for _, b := range allBeans {
-				if b.GetExternalString(beans.PluginClickUp, beans.ExtKeyTaskID) != "" {
+				if b.GetExtensionString(beans.PluginClickUp, beans.ExtKeyTaskID) != "" {
 					beanList = append(beanList, b)
 				}
 			}
@@ -74,8 +74,8 @@ status for all beans that are linked to ClickUp tasks.`,
 
 		statuses := make([]statusInfo, len(beanList))
 		for i, b := range beanList {
-			taskID := b.GetExternalString(beans.PluginClickUp, beans.ExtKeyTaskID)
-			syncedAt := b.GetExternalTime(beans.PluginClickUp, beans.ExtKeySyncedAt)
+			taskID := b.GetExtensionString(beans.PluginClickUp, beans.ExtKeyTaskID)
+			syncedAt := b.GetExtensionTime(beans.PluginClickUp, beans.ExtKeySyncedAt)
 
 			// Calculate needsSync
 			needsSync := true

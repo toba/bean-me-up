@@ -12,8 +12,8 @@ import (
 )
 
 const (
-	// ConfigFileName is the name of the config file
-	ConfigFileName = ".beans.clickup.yml"
+	// LegacyConfigFileName is the name of the legacy standalone config file
+	LegacyConfigFileName = ".beans.clickup.yml"
 	// BeansConfigFileName is the name of the beans CLI config file
 	BeansConfigFileName = ".beans.yml"
 )
@@ -47,6 +47,13 @@ type BeansConfig struct {
 	} `yaml:"beans"`
 }
 
+// beansYMLExtensions is used to parse the extensions section from .beans.yml.
+type beansYMLExtensions struct {
+	Extensions struct {
+		ClickUp ClickUpConfig `yaml:"clickup"`
+	} `yaml:"extensions"`
+}
+
 // CustomFieldsMap maps bean fields to ClickUp custom field UUIDs.
 type CustomFieldsMap struct {
 	BeanID    string `yaml:"bean_id,omitempty"`
@@ -78,7 +85,7 @@ var DefaultPriorityMapping = map[string]int{
 	"deferred": 4,
 }
 
-// FindConfig searches upward from the given directory for a config file.
+// FindConfig searches upward from the given directory for a legacy config file.
 // Returns the absolute path to the config file, or empty string if not found.
 func FindConfig(startDir string) (string, error) {
 	dir, err := filepath.Abs(startDir)
@@ -87,7 +94,7 @@ func FindConfig(startDir string) (string, error) {
 	}
 
 	for {
-		configPath := filepath.Join(dir, ConfigFileName)
+		configPath := filepath.Join(dir, LegacyConfigFileName)
 		if _, err := os.Stat(configPath); err == nil {
 			return configPath, nil
 		}
@@ -101,7 +108,7 @@ func FindConfig(startDir string) (string, error) {
 	}
 }
 
-// Load reads configuration from the given config file path.
+// Load reads configuration from a legacy .beans.clickup.yml file path.
 func Load(configPath string) (*Config, error) {
 	data, err := os.ReadFile(configPath)
 	if err != nil {
@@ -120,7 +127,39 @@ func Load(configPath string) (*Config, error) {
 		return nil, fmt.Errorf("parsing config: %w", err)
 	}
 
-	// Apply defaults for missing values
+	applyDefaults(cfg)
+	return cfg, nil
+}
+
+// LoadFromBeansYML reads ClickUp config from the extensions section of .beans.yml.
+func LoadFromBeansYML(beansYMLPath string) (*Config, error) {
+	data, err := os.ReadFile(beansYMLPath)
+	if err != nil {
+		return nil, fmt.Errorf("reading %s: %w", beansYMLPath, err)
+	}
+
+	var ext beansYMLExtensions
+	if err := yaml.Unmarshal(data, &ext); err != nil {
+		return nil, fmt.Errorf("parsing %s: %w", beansYMLPath, err)
+	}
+
+	// Check if extensions.clickup is actually configured (list_id is the minimum)
+	if ext.Extensions.ClickUp.ListID == "" {
+		return nil, fmt.Errorf("no extensions.clickup section found in %s", beansYMLPath)
+	}
+
+	cfg := &Config{
+		Beans: BeansWrapper{
+			ClickUp: ext.Extensions.ClickUp,
+		},
+	}
+
+	applyDefaults(cfg)
+	return cfg, nil
+}
+
+// applyDefaults fills in default values and validates type mappings.
+func applyDefaults(cfg *Config) {
 	if cfg.Beans.ClickUp.StatusMapping == nil {
 		cfg.Beans.ClickUp.StatusMapping = DefaultStatusMapping
 	}
@@ -140,27 +179,56 @@ func Load(configPath string) (*Config, error) {
 		}
 		cfg.Beans.ClickUp.TypeMapping = validMapping
 	}
-
-	return cfg, nil
 }
 
-// LoadFromDirectory finds and loads the config file by searching upward.
+// LoadFromDirectory finds and loads config by searching for .beans.yml extensions
+// first, then falling back to legacy .beans.clickup.yml.
 func LoadFromDirectory(startDir string) (*Config, string, error) {
-	configPath, err := FindConfig(startDir)
+	dir, err := filepath.Abs(startDir)
 	if err != nil {
 		return nil, "", err
 	}
 
-	if configPath == "" {
-		return nil, "", fmt.Errorf("no %s found (searched from %s)", ConfigFileName, startDir)
+	// First, try .beans.yml extensions section
+	beansYMLPath := findFileUpward(dir, BeansConfigFileName)
+	if beansYMLPath != "" {
+		cfg, err := LoadFromBeansYML(beansYMLPath)
+		if err == nil {
+			return cfg, filepath.Dir(beansYMLPath), nil
+		}
+		// extensions.clickup not found in .beans.yml, fall through to legacy
 	}
 
-	cfg, err := Load(configPath)
+	// Fall back to legacy .beans.clickup.yml
+	legacyPath := findFileUpward(dir, LegacyConfigFileName)
+	if legacyPath == "" {
+		return nil, "", fmt.Errorf("no ClickUp config found (searched for extensions.clickup in %s and %s from %s)",
+			BeansConfigFileName, LegacyConfigFileName, startDir)
+	}
+
+	cfg, err := Load(legacyPath)
 	if err != nil {
 		return nil, "", err
 	}
 
-	return cfg, filepath.Dir(configPath), nil
+	return cfg, filepath.Dir(legacyPath), nil
+}
+
+// findFileUpward searches upward from dir for a file with the given name.
+// Returns the absolute path if found, or empty string if not.
+func findFileUpward(dir, filename string) string {
+	for {
+		candidate := filepath.Join(dir, filename)
+		if _, err := os.Stat(candidate); err == nil {
+			return candidate
+		}
+
+		parent := filepath.Dir(dir)
+		if parent == dir {
+			return ""
+		}
+		dir = parent
+	}
 }
 
 // LoadBeansPath loads the beans path from .beans.yml in the given directory.
@@ -172,20 +240,9 @@ func LoadBeansPath(startDir string) (string, error) {
 		return "", fmt.Errorf("finding beans config: %w", err)
 	}
 
-	var configPath string
-	for {
-		candidatePath := filepath.Join(dir, BeansConfigFileName)
-		if _, err := os.Stat(candidatePath); err == nil {
-			configPath = candidatePath
-			break
-		}
-
-		parent := filepath.Dir(dir)
-		if parent == dir {
-			// Reached filesystem root
-			return "", fmt.Errorf("no %s found (searched from %s)", BeansConfigFileName, startDir)
-		}
-		dir = parent
+	configPath := findFileUpward(dir, BeansConfigFileName)
+	if configPath == "" {
+		return "", fmt.Errorf("no %s found (searched from %s)", BeansConfigFileName, startDir)
 	}
 
 	data, err := os.ReadFile(configPath)

@@ -15,7 +15,7 @@ const (
 	TypeTask      = "task"
 )
 
-// External metadata constants
+// Extension metadata constants
 const (
 	PluginClickUp = "clickup"
 	ExtKeyTaskID  = "task_id"
@@ -45,20 +45,20 @@ type Bean struct {
 	Parent    string                        `json:"parent,omitempty"`
 	Blocking  []string                      `json:"blocking,omitempty"`
 	Tags      []string                      `json:"tags,omitempty"`
-	External  map[string]map[string]any     `json:"external,omitempty"`
+	Extensions map[string]map[string]any    `json:"extensions,omitempty"`
 }
 
-// GetExternalString returns a string value from external plugin data.
+// GetExtensionString returns a string value from extension data.
 // Returns empty string if not found.
-func (b *Bean) GetExternalString(plugin, key string) string {
-	if b.External == nil {
+func (b *Bean) GetExtensionString(name, key string) string {
+	if b.Extensions == nil {
 		return ""
 	}
-	pluginData, ok := b.External[plugin]
+	extData, ok := b.Extensions[name]
 	if !ok {
 		return ""
 	}
-	val, ok := pluginData[key]
+	val, ok := extData[key]
 	if !ok {
 		return ""
 	}
@@ -66,10 +66,10 @@ func (b *Bean) GetExternalString(plugin, key string) string {
 	return s
 }
 
-// GetExternalTime returns a time value from external plugin data.
+// GetExtensionTime returns a time value from extension data.
 // Expects the value to be an RFC3339 string. Returns nil if not found or unparseable.
-func (b *Bean) GetExternalTime(plugin, key string) *time.Time {
-	s := b.GetExternalString(plugin, key)
+func (b *Bean) GetExtensionTime(name, key string) *time.Time {
+	s := b.GetExtensionString(name, key)
 	if s == "" {
 		return nil
 	}

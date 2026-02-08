@@ -18,13 +18,13 @@ var (
 
 var migrateCmd = &cobra.Command{
 	Use:   "migrate",
-	Short: "Migrate sync state from .sync.json to bean external metadata",
+	Short: "Migrate sync state from .sync.json to bean extension metadata",
 	Long: `Migrates ClickUp sync state from the legacy .beans/.sync.json file
-to beans' external metadata system.
+to beans' extension metadata system.
 
-After migration, sync state is stored directly in each bean's YAML
-frontmatter under the "external.clickup" key, eliminating the need
-for a separate sync state file.
+After migration, sync state is stored in each bean's extension data
+under the "clickup" extension, eliminating the need for a separate
+sync state file.
 
 Use --dry-run to preview the migration without making changes.
 Use --delete-sync-file to remove .sync.json after a successful migration.`,
@@ -53,7 +53,7 @@ Use --delete-sync-file to remove .sync.json after a successful migration.`,
 		}
 
 		// Build batch operations
-		var ops []beans.ExternalDataOp
+		var ops []beans.ExtensionDataOp
 		for beanID, beanSync := range allBeans {
 			if beanSync.ClickUp == nil || beanSync.ClickUp.TaskID == "" {
 				continue
@@ -66,9 +66,9 @@ Use --delete-sync-file to remove .sync.json after a successful migration.`,
 				data[beans.ExtKeySyncedAt] = beanSync.ClickUp.SyncedAt.Format(time.RFC3339)
 			}
 
-			ops = append(ops, beans.ExternalDataOp{
+			ops = append(ops, beans.ExtensionDataOp{
 				BeanID: beanID,
-				Plugin: beans.PluginClickUp,
+				Name: beans.PluginClickUp,
 				Data:   data,
 			})
 		}
@@ -94,11 +94,11 @@ Use --delete-sync-file to remove .sync.json after a successful migration.`,
 		beansClient := beans.NewClient(bp)
 		fmt.Printf("Migrating %d bean(s)...\n", len(ops))
 
-		if err := beansClient.SetExternalDataBatch(ops); err != nil {
-			return fmt.Errorf("writing external data: %w", err)
+		if err := beansClient.SetExtensionDataBatch(ops); err != nil {
+			return fmt.Errorf("writing extension data: %w", err)
 		}
 
-		fmt.Printf("Migrated %d bean(s) to external metadata.\n", len(ops))
+		fmt.Printf("Migrated %d bean(s) to extension metadata.\n", len(ops))
 
 		// Optionally delete the sync file
 		if migrateDeleteSyncFile {

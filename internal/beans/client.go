@@ -117,43 +117,43 @@ func (c *Client) GraphQL(query string) ([]byte, error) {
 	return out, nil
 }
 
-// ExternalDataOp describes a single setExternalData operation for batching.
-type ExternalDataOp struct {
+// ExtensionDataOp describes a single setExtensionData operation for batching.
+type ExtensionDataOp struct {
 	BeanID string
-	Plugin string
+	Name   string
 	Data   map[string]any
 }
 
-// SetExternalData sets external plugin data on a single bean.
-func (c *Client) SetExternalData(id, plugin string, data map[string]any) error {
+// SetExtensionData sets extension data on a single bean.
+func (c *Client) SetExtensionData(id, name string, data map[string]any) error {
 	dataJSON, err := json.Marshal(data)
 	if err != nil {
-		return fmt.Errorf("marshaling external data: %w", err)
+		return fmt.Errorf("marshaling extension data: %w", err)
 	}
 
 	query := fmt.Sprintf(
-		`mutation { setExternalData(id: %q, plugin: %q, data: %s) { id } }`,
-		id, plugin, string(dataJSON),
+		`mutation { setExtensionData(id: %q, name: %q, data: %s) { id } }`,
+		id, name, string(dataJSON),
 	)
 
 	_, err = c.GraphQL(query)
 	return err
 }
 
-// RemoveExternalData removes external plugin data from a single bean.
-func (c *Client) RemoveExternalData(id, plugin string) error {
+// RemoveExtensionData removes extension data from a single bean.
+func (c *Client) RemoveExtensionData(id, name string) error {
 	query := fmt.Sprintf(
-		`mutation { removeExternalData(id: %q, plugin: %q) { id } }`,
-		id, plugin,
+		`mutation { removeExtensionData(id: %q, name: %q) { id } }`,
+		id, name,
 	)
 
 	_, err := c.GraphQL(query)
 	return err
 }
 
-// SetExternalDataBatch sets external plugin data on multiple beans in a single
+// SetExtensionDataBatch sets extension data on multiple beans in a single
 // GraphQL call using aliased mutations.
-func (c *Client) SetExternalDataBatch(ops []ExternalDataOp) error {
+func (c *Client) SetExtensionDataBatch(ops []ExtensionDataOp) error {
 	if len(ops) == 0 {
 		return nil
 	}
@@ -163,10 +163,10 @@ func (c *Client) SetExternalDataBatch(ops []ExternalDataOp) error {
 	for i, op := range ops {
 		dataJSON, err := json.Marshal(op.Data)
 		if err != nil {
-			return fmt.Errorf("marshaling external data for %s: %w", op.BeanID, err)
+			return fmt.Errorf("marshaling extension data for %s: %w", op.BeanID, err)
 		}
-		fmt.Fprintf(&b, "  op%d: setExternalData(id: %q, plugin: %q, data: %s) { id }\n",
-			i, op.BeanID, op.Plugin, string(dataJSON))
+		fmt.Fprintf(&b, "  op%d: setExtensionData(id: %q, name: %q, data: %s) { id }\n",
+			i, op.BeanID, op.Name, string(dataJSON))
 	}
 	b.WriteString("}\n")
 

@@ -29,9 +29,10 @@ var rootCmd = &cobra.Command{
 	Long: `beanup syncs beans (from the beans CLI) to ClickUp tasks.
 
 It works as a companion tool to the standard beans CLI, storing sync
-state in bean external metadata via the beans plugin system.
+state in bean extension metadata.
 
-Configuration is stored in .beans.clickup.yml in your project directory.`,
+Configuration is stored in the extensions.clickup section of .beans.yml,
+or in a legacy .beans.clickup.yml file.`,
 	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 		// Skip config loading for help commands and init
 		if cmd.Name() == "help" || cmd.Name() == "completion" || cmd.Name() == "init" || cmd.Name() == "migrate" {
@@ -72,7 +73,7 @@ func Execute() error {
 }
 
 func init() {
-	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "Path to config file (default: searches upward for .beans.clickup.yml)")
+	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "Path to legacy .beans.clickup.yml config file")
 	rootCmd.PersistentFlags().StringVar(&beansPath, "beans-path", "", "path to beans directory (default: from .beans.yml)")
 	rootCmd.PersistentFlags().BoolVar(&jsonOut, "json", false, "output as JSON")
 }
@@ -118,7 +119,7 @@ func outputJSON(v interface{}) error {
 // requireListID returns an error if list_id is not configured.
 func requireListID() error {
 	if cfg.Beans.ClickUp.ListID == "" {
-		return fmt.Errorf("ClickUp list_id is required in .beans.clickup.yml")
+		return fmt.Errorf("ClickUp list_id is required in .beans.yml extensions.clickup or .beans.clickup.yml")
 	}
 	return nil
 }

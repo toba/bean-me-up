@@ -143,39 +143,22 @@ func checkConfiguration(ctx context.Context) checkSection {
 		return section
 	}
 
-	configPath, err := config.FindConfig(cwd)
+	cfg, configDir, err := config.LoadFromDirectory(cwd)
 	if err != nil {
 		section.Checks = append(section.Checks, checkResult{
 			Name:    "Config file found",
 			Status:  checkFail,
-			Message: fmt.Sprintf("Error searching: %v", err),
+			Message: fmt.Sprintf("Not found: %v", err),
 		})
 		return section
 	}
 
-	if configPath == "" {
-		section.Checks = append(section.Checks, checkResult{
-			Name:    "Config file found",
-			Status:  checkFail,
-			Message: "No .beans.clickup.yml found",
-		})
-		return section
-	}
-
-	cfg, err := config.Load(configPath)
-	if err != nil {
-		section.Checks = append(section.Checks, checkResult{
-			Name:    "Config file found",
-			Status:  checkFail,
-			Message: fmt.Sprintf("Cannot parse: %v", err),
-		})
-		return section
-	}
+	_ = configDir
 
 	section.Checks = append(section.Checks, checkResult{
 		Name:    "Config file found",
 		Status:  checkPass,
-		Message: config.ConfigFileName,
+		Message: "loaded",
 	})
 
 	// Check list_id
@@ -447,7 +430,7 @@ func checkSyncState(ctx context.Context) checkSection {
 		section.Checks = append(section.Checks, checkResult{
 			Name:    "Legacy .sync.json",
 			Status:  checkWarn,
-			Message: "Found. Run 'beanup migrate' to migrate to bean external metadata.",
+			Message: "Found. Run 'beanup migrate' to migrate to bean extension metadata.",
 		})
 	}
 
@@ -467,7 +450,7 @@ func checkSyncState(ctx context.Context) checkSection {
 	linkedCount := 0
 	var linkedBeans []beans.Bean
 	for _, b := range allBeans {
-		if b.GetExternalString(beans.PluginClickUp, beans.ExtKeyTaskID) != "" {
+		if b.GetExtensionString(beans.PluginClickUp, beans.ExtKeyTaskID) != "" {
 			linkedCount++
 			linkedBeans = append(linkedBeans, b)
 		}
@@ -487,7 +470,7 @@ func checkSyncState(ctx context.Context) checkSection {
 	staleThreshold := time.Now().AddDate(0, 0, -7)
 	staleCount := 0
 	for _, b := range linkedBeans {
-		syncedAt := b.GetExternalTime(beans.PluginClickUp, beans.ExtKeySyncedAt)
+		syncedAt := b.GetExtensionTime(beans.PluginClickUp, beans.ExtKeySyncedAt)
 		if syncedAt != nil && syncedAt.Before(staleThreshold) {
 			staleCount++
 		}
@@ -509,7 +492,7 @@ func checkSyncState(ctx context.Context) checkSection {
 			missingCount := 0
 
 			for _, b := range linkedBeans {
-				taskID := b.GetExternalString(beans.PluginClickUp, beans.ExtKeyTaskID)
+				taskID := b.GetExtensionString(beans.PluginClickUp, beans.ExtKeyTaskID)
 				_, err := client.GetTask(ctx, taskID)
 				if err != nil {
 					missingCount++
