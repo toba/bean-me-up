@@ -7,8 +7,10 @@ import (
 	"time"
 
 	"github.com/toba/bean-me-up/internal/beans"
+	"github.com/toba/bean-me-up/internal/config"
 	"github.com/toba/bean-me-up/internal/syncstate"
 	"github.com/spf13/cobra"
+	"gopkg.in/yaml.v3"
 )
 
 var (
@@ -19,19 +21,25 @@ var (
 var migrateCmd = &cobra.Command{
 	Use:   "migrate",
 	Short: "Migrate sync state from .sync.json to bean extension metadata",
-	Long: `Migrates ClickUp sync state from the legacy .beans/.sync.json file
-to beans' extension metadata system.
+	Long: `Migrates legacy beanup configuration and sync state:
 
-After migration, sync state is stored in each bean's extension data
-under the "clickup" extension, eliminating the need for a separate
-sync state file.
+1. Moves ClickUp config from .beans.clickup.yml into the extensions.clickup
+   section of .beans.yml (and deletes the legacy file).
+
+2. Migrates sync state from .beans/.sync.json into each bean's extension
+   metadata.
 
 Use --dry-run to preview the migration without making changes.
-Use --delete-sync-file to remove .sync.json after a successful migration.`,
+Use --delete-sync-file to also remove .sync.json after a successful migration.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		bp := getBeansPath()
 		if bp == "" {
 			bp = ".beans"
+		}
+
+		// Migrate .beans.clickup.yml → .beans.yml extensions.clickup
+		if err := migrateConfig(bp, migrateDryRun); err != nil {
+			return err
 		}
 
 		// Load legacy sync state
@@ -130,6 +138,113 @@ Use --delete-sync-file to remove .sync.json after a successful migration.`,
 
 		return nil
 	},
+}
+
+// migrateConfig moves ClickUp configuration from .beans.clickup.yml into .beans.yml
+// under extensions.clickup, then deletes the legacy file.
+func migrateConfig(beansPath string, dryRun bool) error {
+	// Find the directory containing .beans.yml by walking up from the beans path
+	beansDir, err := filepath.Abs(beansPath)
+	if err != nil {
+		return fmt.Errorf("resolving beans path: %w", err)
+	}
+	// The config files live in the project root, which is the parent of .beans/
+	projectDir := filepath.Dir(beansDir)
+
+	legacyPath := filepath.Join(projectDir, config.LegacyConfigFileName)
+	beansYMLPath := filepath.Join(projectDir, config.BeansConfigFileName)
+
+	if _, err := os.Stat(legacyPath); os.IsNotExist(err) {
+		return nil // No legacy config to migrate
+	}
+
+	// Load the legacy config
+	legacyCfg, err := config.Load(legacyPath)
+	if err != nil {
+		return fmt.Errorf("loading %s: %w", config.LegacyConfigFileName, err)
+	}
+
+	if dryRun {
+		fmt.Printf("Would merge %s into %s (extensions.clickup)\n", config.LegacyConfigFileName, config.BeansConfigFileName)
+		fmt.Printf("Would delete %s\n\n", legacyPath)
+		return nil
+	}
+
+	// Read existing .beans.yml as a generic map to preserve all fields
+	beansYML := make(map[string]any)
+	if data, err := os.ReadFile(beansYMLPath); err == nil {
+		if err := yaml.Unmarshal(data, &beansYML); err != nil {
+			return fmt.Errorf("parsing %s: %w", config.BeansConfigFileName, err)
+		}
+	}
+
+	// Build the clickup extension config as a map for clean YAML output
+	clickupMap := make(map[string]any)
+	cu := legacyCfg.Beans.ClickUp
+
+	clickupMap["list_id"] = cu.ListID
+	if cu.Assignee != nil {
+		clickupMap["assignee"] = *cu.Assignee
+	}
+	if cu.StatusMapping != nil {
+		clickupMap["status_mapping"] = cu.StatusMapping
+	}
+	if cu.PriorityMapping != nil {
+		clickupMap["priority_mapping"] = cu.PriorityMapping
+	}
+	if cu.TypeMapping != nil {
+		clickupMap["type_mapping"] = cu.TypeMapping
+	}
+	if cu.CustomFields != nil {
+		cf := make(map[string]any)
+		if cu.CustomFields.BeanID != "" {
+			cf["bean_id"] = cu.CustomFields.BeanID
+		}
+		if cu.CustomFields.CreatedAt != "" {
+			cf["created_at"] = cu.CustomFields.CreatedAt
+		}
+		if cu.CustomFields.UpdatedAt != "" {
+			cf["updated_at"] = cu.CustomFields.UpdatedAt
+		}
+		if len(cf) > 0 {
+			clickupMap["custom_fields"] = cf
+		}
+	}
+	if cu.SyncFilter != nil {
+		sf := make(map[string]any)
+		if len(cu.SyncFilter.ExcludeStatus) > 0 {
+			sf["exclude_status"] = cu.SyncFilter.ExcludeStatus
+		}
+		if len(sf) > 0 {
+			clickupMap["sync_filter"] = sf
+		}
+	}
+
+	// Merge into extensions.clickup
+	extensions, _ := beansYML["extensions"].(map[string]any)
+	if extensions == nil {
+		extensions = make(map[string]any)
+	}
+	extensions["clickup"] = clickupMap
+	beansYML["extensions"] = extensions
+
+	// Write updated .beans.yml
+	out, err := yaml.Marshal(beansYML)
+	if err != nil {
+		return fmt.Errorf("marshaling %s: %w", config.BeansConfigFileName, err)
+	}
+	if err := os.WriteFile(beansYMLPath, out, 0644); err != nil {
+		return fmt.Errorf("writing %s: %w", config.BeansConfigFileName, err)
+	}
+
+	// Delete legacy file
+	if err := os.Remove(legacyPath); err != nil {
+		return fmt.Errorf("deleting %s: %w", config.LegacyConfigFileName, err)
+	}
+
+	fmt.Printf("Merged %s into %s (extensions.clickup)\n", config.LegacyConfigFileName, config.BeansConfigFileName)
+	fmt.Printf("Deleted %s\n\n", legacyPath)
+	return nil
 }
 
 func init() {
