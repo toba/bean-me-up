@@ -699,7 +699,7 @@ func FilterBeansNeedingSync(beanList []beans.Bean, store SyncStateProvider, forc
 
 // parseBeanDueDate parses a bean due date string ("YYYY-MM-DD") into a time.Time.
 func parseBeanDueDate(s string) (time.Time, error) {
-	return time.Parse("2006-01-02", s)
+	return time.ParseInLocation("2006-01-02", s, time.Local)
 }
 
 // beanDueToMillis converts a bean due date string to Unix milliseconds (local midnight).
