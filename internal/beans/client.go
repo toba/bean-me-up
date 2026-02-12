@@ -2,6 +2,7 @@ package beans
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os/exec"
 	"strings"
@@ -126,7 +127,7 @@ func (c *Client) exec(args ...string) ([]byte, error) {
 	cmd := exec.Command("beans", args...)
 	out, err := cmd.Output()
 	if err != nil {
-		if exitErr, ok := err.(*exec.ExitError); ok {
+		if exitErr, ok := errors.AsType[*exec.ExitError](err); ok {
 			return nil, fmt.Errorf("beans %s: %s", strings.Join(args, " "), string(exitErr.Stderr))
 		}
 		return nil, fmt.Errorf("beans %s: %w", strings.Join(args, " "), err)

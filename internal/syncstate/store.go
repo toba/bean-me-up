@@ -5,6 +5,7 @@ package syncstate
 import (
 	"encoding/json"
 	"fmt"
+	"maps"
 	"os"
 	"path/filepath"
 	"sync"
@@ -134,9 +135,7 @@ func (s *Store) GetAllBeans() map[string]*BeanSync {
 	defer s.mu.RUnlock()
 
 	result := make(map[string]*BeanSync, len(s.data.Beans))
-	for k, v := range s.data.Beans {
-		result[k] = v
-	}
+	maps.Copy(result, s.data.Beans)
 	return result
 }
 

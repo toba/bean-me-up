@@ -1,6 +1,6 @@
 module github.com/toba/bean-me-up
 
-go 1.24.6
+go 1.26.0
 
 require (
 	github.com/fatih/color v1.18.0

@@ -8,8 +8,8 @@ import (
 	"os/exec"
 	"path/filepath"
 
-	"github.com/toba/bean-me-up/internal/config"
 	"github.com/spf13/cobra"
+	"github.com/toba/bean-me-up/internal/config"
 )
 
 var (
@@ -110,7 +110,7 @@ func getClickUpToken() (string, error) {
 }
 
 // outputJSON writes a value as indented JSON to stdout.
-func outputJSON(v interface{}) error {
+func outputJSON(v any) error {
 	enc := json.NewEncoder(os.Stdout)
 	enc.SetIndent("", "  ")
 	return enc.Encode(v)

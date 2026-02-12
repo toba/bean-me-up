@@ -434,6 +434,153 @@ func TestSyncTags_CachePreventsRedundantSpaceTagCreation(t *testing.T) {
 	}
 }
 
+func TestSyncBean_CreateWithDueDate(t *testing.T) {
+	var capturedReq CreateTaskRequest
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == "POST" && strings.Contains(r.URL.Path, "/list/") {
+			_ = json.NewDecoder(r.Body).Decode(&capturedReq)
+			resp := taskResponse{
+				ID:     "task-456",
+				Name:   "Test",
+				Status: Status{Status: "to do"},
+				URL:    "https://app.clickup.com/t/task-456",
+			}
+			w.Header().Set("Content-Type", "application/json")
+			_ = json.NewEncoder(w).Encode(resp)
+			return
+		}
+		if r.URL.Path == "/api/v2/user" {
+			resp := userResponse{User: AuthorizedUser{ID: 1, Username: "test"}}
+			_ = json.NewEncoder(w).Encode(resp)
+			return
+		}
+		w.WriteHeader(200)
+		_, _ = w.Write([]byte("{}"))
+	}))
+	defer server.Close()
+
+	client := &Client{
+		token: "test",
+		httpClient: &http.Client{
+			Transport: &redirectTransport{target: server.URL},
+		},
+	}
+
+	syncer := newTestSyncer(t, client)
+
+	t.Run("with due date", func(t *testing.T) {
+		due := "2025-06-15"
+		now := time.Now()
+		b := &beans.Bean{
+			ID:        "bean-due",
+			Title:     "Bean with due date",
+			Status:    "todo",
+			Type:      "task",
+			Due:       &due,
+			CreatedAt: &now,
+			UpdatedAt: &now,
+		}
+
+		result := syncer.syncBean(context.Background(), b)
+		if result.Action != "created" {
+			t.Fatalf("expected action 'created', got %q", result.Action)
+		}
+		if capturedReq.DueDate == nil {
+			t.Fatal("expected DueDate to be set in create request")
+		}
+		if capturedReq.DueDatetime == nil || *capturedReq.DueDatetime != false {
+			t.Error("expected DueDatetime to be false")
+		}
+	})
+
+	t.Run("without due date", func(t *testing.T) {
+		capturedReq = CreateTaskRequest{} // reset
+		now := time.Now()
+		b := &beans.Bean{
+			ID:        "bean-nodue",
+			Title:     "Bean without due date",
+			Status:    "todo",
+			Type:      "task",
+			CreatedAt: &now,
+			UpdatedAt: &now,
+		}
+
+		result := syncer.syncBean(context.Background(), b)
+		if result.Action != "created" {
+			t.Fatalf("expected action 'created', got %q", result.Action)
+		}
+		if capturedReq.DueDate != nil {
+			t.Errorf("expected DueDate to be nil, got %v", *capturedReq.DueDate)
+		}
+	})
+}
+
+func TestSyncBean_UpdateDueDate(t *testing.T) {
+	existingDue := "1750000000000" // existing due date in ClickUp (Unix ms)
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == "GET" && strings.Contains(r.URL.Path, "/task/") {
+			resp := taskResponse{
+				ID:      "task-789",
+				Name:    "Test bean",
+				Status:  Status{Status: "to do"},
+				URL:     "https://app.clickup.com/t/task-789",
+				DueDate: &existingDue,
+			}
+			w.Header().Set("Content-Type", "application/json")
+			_ = json.NewEncoder(w).Encode(resp)
+			return
+		}
+		if r.Method == "PUT" && strings.Contains(r.URL.Path, "/task/") {
+			resp := taskResponse{
+				ID:     "task-789",
+				Name:   "Test bean",
+				Status: Status{Status: "to do"},
+				URL:    "https://app.clickup.com/t/task-789",
+			}
+			w.Header().Set("Content-Type", "application/json")
+			_ = json.NewEncoder(w).Encode(resp)
+			return
+		}
+		w.WriteHeader(200)
+		_, _ = w.Write([]byte("{}"))
+	}))
+	defer server.Close()
+
+	client := &Client{
+		token: "test",
+		httpClient: &http.Client{
+			Transport: &redirectTransport{target: server.URL},
+		},
+	}
+
+	store := newMemorySyncProvider()
+	store.SetTaskID("bean-1", "task-789")
+	syncer := &Syncer{
+		client:       client,
+		config:       &config.ClickUpConfig{},
+		opts:         SyncOptions{ListID: "test-list", Force: true},
+		syncStore:    store,
+		beanToTaskID: make(map[string]string),
+	}
+
+	due := "2025-12-25"
+	now := time.Now()
+	b := &beans.Bean{
+		ID:        "bean-1",
+		Title:     "Test bean",
+		Status:    "todo",
+		Type:      "task",
+		Due:       &due,
+		CreatedAt: &now,
+		UpdatedAt: &now,
+	}
+
+	result := syncer.syncBean(context.Background(), b)
+	if result.Action != "updated" {
+		t.Fatalf("expected action 'updated', got %q", result.Action)
+	}
+}
+
 func slicesEqual(a, b []string) bool {
 	if len(a) == 0 && len(b) == 0 {
 		return true

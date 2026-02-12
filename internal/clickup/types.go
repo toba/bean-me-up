@@ -13,6 +13,7 @@ type TaskInfo struct {
 	CustomItemID *int               `json:"custom_item_id"` // Custom task type ID
 	CustomFields []TaskCustomField  `json:"custom_fields"`  // Custom field values
 	Tags         []Tag              `json:"tags"`           // Task tags
+	DueDate      *string            `json:"due_date"`       // Due date as Unix ms string
 }
 
 // TaskPriority represents a ClickUp task priority.
@@ -55,6 +56,8 @@ type CreateTaskRequest struct {
 	Priority            *int          `json:"priority,omitempty"`
 	Assignees           []int         `json:"assignees,omitempty"`      // User IDs to assign
 	Parent              *string       `json:"parent,omitempty"`         // Parent task ID for subtasks
+	DueDate             *int64        `json:"due_date,omitempty"`
+	DueDatetime         *bool         `json:"due_date_time,omitempty"`
 	CustomFields        []CustomField `json:"custom_fields,omitempty"`
 	CustomItemID        *int          `json:"custom_item_id,omitempty"` // Custom task type ID (e.g., Bug, Milestone)
 }
@@ -72,6 +75,8 @@ type UpdateTaskRequest struct {
 	MarkdownDescription *string `json:"markdown_description,omitempty"`
 	Status              *string `json:"status,omitempty"`
 	Priority            *int    `json:"priority,omitempty"`
+	DueDate             *int64  `json:"due_date,omitempty"`
+	DueDatetime         *bool   `json:"due_date_time,omitempty"`
 	Parent              *string `json:"parent,omitempty"`
 	CustomItemID        *int    `json:"custom_item_id,omitempty"` // Custom task type ID (e.g., Bug, Milestone)
 }
@@ -83,6 +88,7 @@ func (u *UpdateTaskRequest) hasChanges() bool {
 		u.MarkdownDescription != nil ||
 		u.Status != nil ||
 		u.Priority != nil ||
+		u.DueDate != nil ||
 		u.Parent != nil ||
 		u.CustomItemID != nil
 }
@@ -114,6 +120,7 @@ type taskResponse struct {
 	CustomItemID *int              `json:"custom_item_id"`
 	CustomFields []TaskCustomField `json:"custom_fields"`
 	Tags         []Tag             `json:"tags"`
+	DueDate      *string           `json:"due_date"`
 }
 
 // toTaskInfo converts a taskResponse to a TaskInfo.
@@ -129,6 +136,7 @@ func (r *taskResponse) toTaskInfo() *TaskInfo {
 		CustomItemID: r.CustomItemID,
 		CustomFields: r.CustomFields,
 		Tags:         r.Tags,
+		DueDate:      r.DueDate,
 	}
 }
 

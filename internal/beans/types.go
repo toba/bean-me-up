@@ -44,6 +44,7 @@ type Bean struct {
 	Body      string                        `json:"body,omitempty"`
 	Parent    string                        `json:"parent,omitempty"`
 	Blocking  []string                      `json:"blocking,omitempty"`
+	Due       *string                        `json:"due,omitempty"`
 	Tags      []string                      `json:"tags,omitempty"`
 	Extensions map[string]map[string]any    `json:"extensions,omitempty"`
 }

@@ -131,10 +131,8 @@ func (s *Syncer) SyncBeans(ctx context.Context, beanList []beans.Bean) ([]SyncRe
 	}
 
 	// Pass 1: Create/update parent tasks in parallel
-	for i := range parents {
-		wg.Add(1)
-		go func(bean beans.Bean) {
-			defer wg.Done()
+	for _, bean := range parents {
+		wg.Go(func() {
 			result := s.syncBean(ctx, &bean)
 			idx := beanIndex[bean.ID]
 			results[idx] = result
@@ -145,15 +143,13 @@ func (s *Syncer) SyncBeans(ctx context.Context, beanList []beans.Bean) ([]SyncRe
 				mu.Unlock()
 			}
 			reportProgress(result)
-		}(parents[i])
+		})
 	}
 	wg.Wait()
 
 	// Pass 2: Create/update child tasks in parallel (parents now exist)
-	for i := range children {
-		wg.Add(1)
-		go func(bean beans.Bean) {
-			defer wg.Done()
+	for _, bean := range children {
+		wg.Go(func() {
 			result := s.syncBean(ctx, &bean)
 			idx := beanIndex[bean.ID]
 			results[idx] = result
@@ -164,21 +160,19 @@ func (s *Syncer) SyncBeans(ctx context.Context, beanList []beans.Bean) ([]SyncRe
 				mu.Unlock()
 			}
 			reportProgress(result)
-		}(children[i])
+		})
 	}
 	wg.Wait()
 
 	// Pass 3: Sync blocking relationships in parallel (if not disabled)
 	if !s.opts.NoRelationships && !s.opts.DryRun {
-		for i := range beanList {
-			wg.Add(1)
-			go func(bean beans.Bean) {
-				defer wg.Done()
+		for _, bean := range beanList {
+			wg.Go(func() {
 				if err := s.syncRelationships(ctx, &bean); err != nil {
 					// Log but don't fail - relationships are best-effort
 					_ = err
 				}
-			}(beanList[i])
+			})
 		}
 		wg.Wait()
 	}
@@ -280,6 +274,15 @@ func (s *Syncer) syncBean(ctx context.Context, b *beans.Bean) SyncResult {
 		Assignees:           s.getAssignees(ctx),
 		CustomFields:        s.buildCustomFields(b),
 		CustomItemID:        s.getClickUpCustomItemID(b.Type),
+	}
+
+	// Set due date if bean has one
+	if b.Due != nil {
+		if dueTime, err := parseBeanDueDate(*b.Due); err == nil {
+			millis := toLocalDateMillis(dueTime)
+			createReq.DueDate = &millis
+			createReq.DueDatetime = ptrBool(false)
+		}
 	}
 
 	// Set parent task ID if bean has a parent that's already synced
@@ -440,6 +443,20 @@ func (s *Syncer) buildUpdateRequest(current *TaskInfo, b *beans.Bean, descriptio
 	// Only include status if changed
 	if clickUpStatus != "" && current.Status.Status != clickUpStatus {
 		update.Status = &clickUpStatus
+	}
+
+	// Only include due date if changed
+	newDueMillis := beanDueToMillis(b.Due)
+	currentDueMillis := clickUpDueToMillis(current.DueDate)
+	if !int64PtrEqual(currentDueMillis, newDueMillis) {
+		if newDueMillis != nil {
+			update.DueDate = newDueMillis
+			update.DueDatetime = ptrBool(false)
+		} else {
+			// Clear due date: ClickUp accepts null to remove it
+			zero := int64(0)
+			update.DueDate = &zero
+		}
 	}
 
 	// Only include custom item ID if changed
@@ -678,6 +695,54 @@ func FilterBeansNeedingSync(beanList []beans.Bean, store SyncStateProvider, forc
 		}
 	}
 	return needSync
+}
+
+// parseBeanDueDate parses a bean due date string ("YYYY-MM-DD") into a time.Time.
+func parseBeanDueDate(s string) (time.Time, error) {
+	return time.Parse("2006-01-02", s)
+}
+
+// beanDueToMillis converts a bean due date string to Unix milliseconds (local midnight).
+// Returns nil if the bean has no due date or the date is unparseable.
+func beanDueToMillis(due *string) *int64 {
+	if due == nil || *due == "" {
+		return nil
+	}
+	t, err := parseBeanDueDate(*due)
+	if err != nil {
+		return nil
+	}
+	millis := toLocalDateMillis(t)
+	return &millis
+}
+
+// clickUpDueToMillis parses ClickUp's due_date string (Unix ms) into an *int64.
+// Returns nil if the string is nil or empty.
+func clickUpDueToMillis(s *string) *int64 {
+	if s == nil || *s == "" {
+		return nil
+	}
+	var millis int64
+	if _, err := fmt.Sscanf(*s, "%d", &millis); err != nil {
+		return nil
+	}
+	return &millis
+}
+
+// int64PtrEqual compares two int64 pointers for equality.
+func int64PtrEqual(a, b *int64) bool {
+	if a == nil && b == nil {
+		return true
+	}
+	if a == nil || b == nil {
+		return false
+	}
+	return *a == *b
+}
+
+// ptrBool returns a pointer to a bool value.
+func ptrBool(v bool) *bool {
+	return &v
 }
 
 // FilterBeansForSync filters beans based on sync filter configuration.

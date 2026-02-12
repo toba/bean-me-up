@@ -6,7 +6,7 @@
 
 [tools]
 # Core runtimes - pin major.minor, allow patch updates
-go = "1.25"
+go = "1.26.0"
 # Go-based tools
 "go:github.com/hmans/beans" = "latest"
 # Install from GitHub releases (built by GoReleaser)
